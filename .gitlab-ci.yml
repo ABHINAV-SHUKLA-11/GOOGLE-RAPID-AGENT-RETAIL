@@ -1,3 +1,5 @@
+image: python:3.11
+
 stages:
   - build
   - deploy
@@ -10,16 +12,20 @@ variables:
 build_job:
   stage: build
   script:
-    - python -m venv .venv
+    - python3 -m venv .venv
     - source .venv/bin/activate
+    - pip install --upgrade pip
     - pip install -r requirements.txt
     - echo "Dependencies installed successfully!"
+  artifacts:
+    paths:
+      - .venv/
 
 # Step 2: Deployment
 deploy_job:
   stage: deploy
   script:
     - echo "Deploying to Google Cloud..."
-    - python src/deploy.py
+    - python3 src/deploy.py
   only:
     - main

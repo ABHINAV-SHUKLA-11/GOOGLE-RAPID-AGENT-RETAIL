@@ -49,8 +49,8 @@ Our agent automates:
 
 ```bash
 # 1. Clone the repository
-git clone 
-cd mongodb-retail-agent
+git clone -https://gitlab.com/abhinavshukla76117/google-rapid-agent-retail
+cd Google-rapid-agent-retail
 
 # 2. Copy environment template
 cp .env.example .env

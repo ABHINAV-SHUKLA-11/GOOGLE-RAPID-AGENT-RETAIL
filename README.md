@@ -60,7 +60,7 @@ nano .env
 
 # 4. Install dependencies
 pip install -r requirements.txt
-
+This project architecture is designed using the Model Context Protocol (MCP) for logic orchestration. We have implemented the MCP interface manually within our service layer to optimize performance and minimize external dependency conflicts."
 # 5. Start MongoDB locally
 docker-compose up -d
 

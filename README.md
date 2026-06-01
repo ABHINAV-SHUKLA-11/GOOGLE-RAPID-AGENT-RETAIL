@@ -49,7 +49,7 @@ Our agent automates:
 
 ```bash
 # 1. Clone the repository
-git clone https://gitlab.com/your-username/mongodb-retail-agent.git
+git clone 
 cd mongodb-retail-agent
 
 # 2. Copy environment template

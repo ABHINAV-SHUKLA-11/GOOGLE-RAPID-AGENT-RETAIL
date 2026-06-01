@@ -2,12 +2,24 @@ image: python:3.11
 
 stages:
   - build
+  - deploy
 
 build_job:
   stage: build
   script:
-    - python3 --version
     - python3 -m venv .venv
     - source .venv/bin/activate
     - pip install --upgrade pip
-    - echo "Build successful!"
+    - pip install -r requirements.txt
+    - echo "Dependencies installed successfully!"
+  artifacts:
+    paths:
+      - .venv/
+
+deploy_job:
+  stage: deploy
+  script:
+    - echo "Deploying to Google Cloud..."
+    # Yahan tumhari actual deploy command aayegi (jaise: python3 src/deploy.py)
+  only:
+    - main

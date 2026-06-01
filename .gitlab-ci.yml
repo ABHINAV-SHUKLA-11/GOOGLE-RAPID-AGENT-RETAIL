@@ -1,6 +1,0 @@
-image: python:3.9
-
-build_job:
-  script:
-    - python --version
-    - python3 -m venv .venv

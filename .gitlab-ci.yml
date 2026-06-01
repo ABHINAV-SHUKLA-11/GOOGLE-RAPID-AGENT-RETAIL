@@ -3,4 +3,4 @@ image: python:3.9
 build_job:
   script:
     - python --version
-    - python -m venv .venv
+    - python3 -m venv .venv

@@ -1,4 +1,4 @@
-image: python:3.9
+image: python:3.11
 
 stages:
   - build
@@ -10,7 +10,4 @@ build_job:
     - python3 -m venv .venv
     - source .venv/bin/activate
     - pip install --upgrade pip
-    # - pip install -r requirements.txt
-  artifacts:
-    paths:
-      - .venv/
+    - echo "Build successful!"

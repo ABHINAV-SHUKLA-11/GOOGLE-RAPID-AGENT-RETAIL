@@ -1,0 +1,97 @@
+{
+  "test_scenarios": [
+    {
+      "scenario_id": "low_stock_alert",
+      "description": "Product inventory is below reorder point",
+      "store_id": "store-001",
+      "product_id": "PROD-SKU-12345",
+      "product_name": "Premium Coffee Beans 1kg",
+      "current_inventory": 25,
+      "reorder_point": 100,
+      "reorder_quantity": 500,
+      "daily_sales_rate": 8.5,
+      "expected_actions": [
+        "Check inventory levels",
+        "Calculate days until stockout",
+        "Create purchase order",
+        "Send LOW_STOCK alert to manager"
+      ],
+      "expected_output": {
+        "status": "ACTION_TAKEN",
+        "purchase_order_created": true,
+        "alert_sent": true,
+        "days_until_stockout": 3
+      }
+    },
+    {
+      "scenario_id": "overstock_warning",
+      "description": "Product has excessive inventory",
+      "store_id": "store-002",
+      "product_id": "PROD-SKU-67890",
+      "product_name": "Seasonal Holiday Decorations",
+      "current_inventory": 2500,
+      "reorder_point": 100,
+      "average_daily_sales": 2,
+      "days_of_supply": 1250,
+      "expected_actions": [
+        "Detect overstock condition",
+        "Send OVERSTOCK alert",
+        "Recommend markdown or promotion"
+      ],
+      "expected_output": {
+        "status": "OVERSTOCK_DETECTED",
+        "alert_sent": true,
+        "recommendation": "Consider promotion or markdown"
+      }
+    },
+    {
+      "scenario_id": "stockout_imminent",
+      "description": "Product will run out in next 24 hours",
+      "store_id": "store-003",
+      "product_id": "PROD-SKU-11111",
+      "product_name": "Bestselling Novel - Latest Edition",
+      "current_inventory": 8,
+      "daily_sales_rate": 12,
+      "expected_actions": [
+        "Detect critical stockout warning",
+        "Create emergency purchase order",
+        "Send STOCKOUT_WARNING alert",
+        "Notify manager immediately"
+      ],
+      "expected_output": {
+        "status": "CRITICAL",
+        "emergency_order_created": true,
+        "alert_priority": "HIGH",
+        "estimated_stockout_hours": 16
+      }
+    },
+    {
+      "scenario_id": "healthy_inventory",
+      "description": "Product inventory is optimal",
+      "store_id": "store-001",
+      "product_id": "PROD-SKU-99999",
+      "product_name": "Popular Snack Mix",
+      "current_inventory": 450,
+      "reorder_point": 100,
+      "reorder_quantity": 500,
+      "daily_sales_rate": 5,
+      "days_of_supply": 90,
+      "expected_actions": [
+        "Verify inventory is healthy",
+        "No action needed",
+        "Log status"
+      ],
+      "expected_output": {
+        "status": "HEALTHY",
+        "action_required": false,
+        "days_of_supply": 90
+      }
+    }
+  ],
+  "bulk_store_check": {
+    "description": "Run inventory check across multiple stores simultaneously",
+    "stores": ["store-001", "store-002", "store-003", "store-004", "store-005"],
+    "products_to_check": 50,
+    "expected_outcome": "Agent monitors all stores and creates orders for low-stock items"
+  }
+}

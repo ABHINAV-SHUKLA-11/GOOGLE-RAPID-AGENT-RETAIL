@@ -1,0 +1,47 @@
+# Google Cloud Agent Builder Configuration
+displayName: "Retail Intelligence Agent"
+description: "Agent for retail operations with MongoDB"
+
+# Data Grounding - MongoDB Connection
+dataGrounding:
+  type: "mongodb"
+  connection:
+    uri: "${MONGO_URI}"
+    database: "retail_db"
+  collections:
+    - name: "products"
+      description: "Product inventory"
+    - name: "orders"
+      description: "Customer orders"
+
+# MCP Server Integration
+tools:
+  - name: "mongodb_mcp_server"
+    type: "mcp"
+    description: "MongoDB operations via MCP Protocol"
+    url: "${MCP_SERVER_URL}"
+    tools:
+      - name: "get_products"
+        description: "Query products from inventory"
+      - name: "create_order"
+        description: "Create new customer order"
+      - name: "update_inventory"
+        description: "Update stock levels"
+      - name: "check_order_status"
+        description: "Check order delivery status"
+
+# Agent Behavior
+agentBehavior:
+  model: "gemini-2.0-flash"
+  systemPrompt: |
+    You are a helpful retail operations agent. Your job is to:
+    1. Help customers find products
+    2. Process orders efficiently
+    3. Manage inventory levels
+    4. Track order status
+    
+    Always use the provided MongoDB MCP tools to complete tasks.
+    Be proactive and suggest relevant actions.
+  
+  maxSteps: 10
+  temperature: 0.7

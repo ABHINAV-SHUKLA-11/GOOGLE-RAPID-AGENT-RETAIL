@@ -1,0 +1,25 @@
+stages:
+  - build
+  - deploy
+
+# Pipeline ka setup
+variables:
+  PYTHON_VERSION: "3.11"
+
+# Step 1: Build & Test
+build_job:
+  stage: build
+  script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install -r requirements.txt
+    - echo "Dependencies installed successfully!"
+
+# Step 2: Deployment
+deploy_job:
+  stage: deploy
+  script:
+    - echo "Deploying to Google Cloud..."
+    - python src/deploy.py
+  only:
+    - main

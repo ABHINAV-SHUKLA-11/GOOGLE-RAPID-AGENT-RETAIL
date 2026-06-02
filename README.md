@@ -96,7 +96,7 @@ GET    /api/analytics                # Get retail analytics
 🔐 Environment Variables
 
 
-GOOGLE\_CLOUD\_PROJECT\_ID=your-project-id
+GOOGLE\_CLOUD\_PROJECT\_ID=stalwart-bliss-480715-g7
 GOOGLE\_CLOUD\_REGION=us-central1
 MONGODB\_URI=mongodb+srv://user:pass@cluster.mongodb.net/retail\_db
 GEMINI\_API\_KEY=your-gemini-api-key

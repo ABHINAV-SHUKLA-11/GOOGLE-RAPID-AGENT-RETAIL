@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from google.cloud import aiplatform
 
-from google.cloud.aiplatform_v1beta1.services.agents_client import AgentsClient
+from google.cloud.aiplatform_v1beta1 import AgentsClient
 import os
 import logging
 import sys
@@ -80,7 +80,7 @@ def query_agent():
         
         try:
             logger.info("Initializing AI Platform client")
-      
+
 client = AgentsClient(client_options={"api_endpoint": f"{LOCATION}-aiplatform.googleapis.com"})
             agent_path = client.agent_path(PROJECT_ID, LOCATION, AGENT_ID)
             

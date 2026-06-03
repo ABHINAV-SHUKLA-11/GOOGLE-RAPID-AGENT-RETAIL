@@ -1,153 +1,143 @@
 from flask import Flask, request, jsonify
-from google.cloud import aiplatform
+from flask_cors import CORS
+from pymongo import MongoClient
+import os, logging, sys, json
+from bson import ObjectId
 
-from google.cloud.aiplatform_v1beta1 import AgentsClient
-import os
-import logging
-import sys
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout,
-    force=True
-)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 
 # Environment variables
-PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-AGENT_ID = os.getenv("AGENT_ID")
-LOCATION = "us-central1"
 PORT = int(os.getenv("PORT", 8080))
+MONGODB_URI = os.getenv("MONGODB_URI")
+DB_NAME = os.getenv("DB_NAME", "retail_db")
 
-logger.info(f"Flask app initializing - PROJECT_ID={PROJECT_ID}, AGENT_ID={AGENT_ID}")
+# MongoDB connection
+mongo_client = None
+db = None
+
+def get_db():
+    global mongo_client, db
+    if db is None:
+        mongo_client = MongoClient(MONGODB_URI)
+        db = mongo_client[DB_NAME]
+    return db
+
+# ---- AI Agent (Google AI Studio) ----
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+def query_gemini_agent(user_message, mongo_context=""):
+    import requests
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    system_prompt = f"""You are a smart retail AI agent. You help users with:
+- Finding products
+- Checking inventory
+- Creating orders
+- Tracking order status
+
+Current data from MongoDB:
+{mongo_context}
+
+Answer based on this data. Be concise and helpful."""
+
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": system_prompt + "\n\nUser: " + user_message}]}
+        ]
+    }
+    
+    resp = requests.post(url, json=payload)
+    result = resp.json()
+    return result["candidates"][0]["content"]["parts"][0]["text"]
+
+# ---- Routes ----
 
 @app.route('/', methods=['GET'])
 def root():
-    """Root endpoint"""
-    logger.info("Root endpoint called")
-    return jsonify({
-        "status": "running",
-        "service": "Flask AI Agent",
-        "endpoints": {
-            "/health": "GET",
-            "/query": "POST",
-            "/mcp/tools": "GET"
-        }
-    }), 200
+    return {"status": "running", "service": "Retail AI Agent",
+            "endpoints": {"/health": "GET", "/query": "POST", "/mcp/tools": "GET"}}, 200
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check"""
-    logger.info("Health check called")
-    return jsonify({
-        "status": "healthy",
-        "service": "Flask AI Agent",
-        "timestamp": str(os.getcwd())
-    }), 200
+    try:
+        get_db().command("ping")
+        mongo_status = "connected"
+    except:
+        mongo_status = "disconnected"
+    return {"status": "healthy", "mongodb": mongo_status}, 200
 
 @app.route('/query', methods=['POST'])
 def query_agent():
-    """Query the AI Agent"""
     try:
-        logger.info("Query endpoint called")
-        
         data = request.get_json()
-        if not data:
-            logger.warning("Empty request body")
-            return jsonify({
-                "status": "error",
-                "message": "Request body cannot be empty"
-            }), 400
-        
-        user_message = data.get("message", "")
-        if not user_message:
-            logger.warning("Message field missing")
-            return jsonify({
-                "status": "error",
-                "message": "Message field is required"
-            }), 400
-        
-        if not PROJECT_ID or not AGENT_ID:
-            logger.error("GCP credentials not set")
-            return jsonify({
-                "status": "error",
-                "message": "GCP credentials not configured"
-            }), 500
-        
-        try:
-            logger.info("Initializing AI Platform client")
+        if not data or not data.get("message"):
+            return {"status": "error", "message": "Message field is required"}, 400
 
-client = AgentsClient(client_options={"api_endpoint": f"{LOCATION}-aiplatform.googleapis.com"})
-            agent_path = client.agent_path(PROJECT_ID, LOCATION, AGENT_ID)
-            
-            session_id = data.get("session_id", f"session-{os.urandom(4).hex()}")
-            logger.info(f"Sending query to agent - Session: {session_id}")
-            
-            response = client.generate_response(
-                agent=agent_path,
-                session_id=session_id,
-                input=user_message
-            )
-            
-            logger.info(f"Agent response received successfully")
-            
-            return jsonify({
-                "status": "success",
-                "response": response.output_text,
-                "session_id": session_id
-            }), 200
-            
-        except Exception as e:
-            logger.error(f"Agent API error: {str(e)}", exc_info=True)
-            return jsonify({
-                "status": "error",
-                "message": f"Agent API error: {str(e)}"
-            }), 500
-    
+        user_message = data["message"]
+        session_id = data.get("session_id", f"session-{os.urandom(4).hex()}")
+
+        # MongoDB se context fetch karo
+        database = get_db()
+        
+        # Products fetch karo
+        products = list(database.products.find({}, {"_id": 0}).limit(10))
+        orders = list(database.orders.find({}, {"_id": 0}).limit(5))
+        
+        mongo_context = f"Products: {json.dumps(products)}\nRecent Orders: {json.dumps(orders)}"
+        
+        # Gemini se answer lo
+        reply = query_gemini_agent(user_message, mongo_context)
+
+        return {"status": "success", "response": reply, "session_id": session_id}, 200
+
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        logger.error(f"Error: {str(e)}", exc_info=True)
+        return {"status": "error", "message": str(e)}, 500
 
 @app.route('/mcp/tools', methods=['GET'])
 def get_mcp_tools():
-    """Get MCP tools"""
-    logger.info("MCP tools endpoint called")
-    return jsonify({
-        "get_products": {
-            "description": "Query products from MongoDB",
-            "params": ["filter"]
-        },
-        "create_order": {
-            "description": "Create order",
-            "params": ["customer_id", "products"]
-        },
-        "update_inventory": {
-            "description": "Update stock",
-            "params": ["product_id", "quantity"]
-        },
-        "check_order_status": {
-            "description": "Check order status",
-            "params": ["order_id"]
-        }
-    }), 200
+    return {
+        "get_products": {"description": "Query products from MongoDB", "params": ["filter"]},
+        "create_order": {"description": "Create order", "params": ["customer_id", "products"]},
+        "update_inventory": {"description": "Update stock", "params": ["product_id", "quantity"]},
+        "check_order_status": {"description": "Check order status", "params": ["order_id"]}
+    }, 200
+
+@app.route('/products', methods=['GET'])
+def get_products():
+    try:
+        db = get_db()
+        products = list(db.products.find({}, {"_id": 0}).limit(20))
+        return {"status": "success", "products": products, "count": len(products)}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/orders', methods=['GET'])
+def get_orders():
+    try:
+        db = get_db()
+        orders = list(db.orders.find({}, {"_id": 0}).limit(20))
+        return {"status": "success", "orders": orders}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/orders', methods=['POST'])
+def create_order():
+    try:
+        data = request.get_json()
+        db = get_db()
+        result = db.orders.insert_one(data)
+        return {"status": "success", "order_id": str(result.inserted_id)}, 201
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
 
 @app.errorhandler(404)
 def not_found(e):
-    logger.warning(f"404 Not Found: {request.path}")
-    return jsonify({"status": "error", "message": "Endpoint not found"}), 404
-
-@app.errorhandler(500)
-def server_error(e):
-    logger.error(f"500 Server Error: {str(e)}", exc_info=True)
-    return jsonify({"status": "error", "message": "Internal server error"}), 500
+    return {"status": "error", "message": "Endpoint not found"}, 404
 
 if __name__ == '__main__':
-    logger.info(f"🚀 Starting Flask on 0.0.0.0:{PORT}")
     app.run(host='0.0.0.0', port=PORT, debug=False)

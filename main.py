@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from google.cloud import aiplatform
+
+from google.cloud.aiplatform_v1beta1.services.agents_client import AgentsClient
 import os
 import logging
 import sys

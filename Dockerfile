@@ -1,23 +1,41 @@
-FROM python:3.11-slim
+# Multi-stage build for smaller image
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Install system dependencies (if needed)
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip install --upgrade pip setuptools wheel
-
-# Copy and install requirements
+# Copy requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python dependencies
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+
+# Final stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONUNBUFFERED=1
 
 # Copy application
 COPY . .
 
+# Expose port
 EXPOSE 8080
 
-# Run Flask
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start Flask with Gunicorn (production-ready)
+CMD exec gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 --access-logfile - --error-logfile - main:app

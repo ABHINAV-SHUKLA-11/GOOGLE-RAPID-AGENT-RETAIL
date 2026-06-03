@@ -4,61 +4,63 @@ import os
 import logging
 import sys
 
-# Setup logging
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
+    stream=sys.stdout,
+    force=True
 )
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Get environment variables
+# Environment variables
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 AGENT_ID = os.getenv("AGENT_ID")
 LOCATION = "us-central1"
 PORT = int(os.getenv("PORT", 8080))
 
-logger.info(f"Starting Flask app with PROJECT_ID={PROJECT_ID}, AGENT_ID={AGENT_ID}, PORT={PORT}")
-
-@app.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
-    logger.info("Health check called")
-    return jsonify({
-        "status": "healthy",
-        "project_id": PROJECT_ID if PROJECT_ID else "NOT SET",
-        "agent_id": AGENT_ID if AGENT_ID else "NOT SET"
-    }), 200
+logger.info(f"Flask app initializing - PROJECT_ID={PROJECT_ID}, AGENT_ID={AGENT_ID}")
 
 @app.route('/', methods=['GET'])
 def root():
     """Root endpoint"""
+    logger.info("Root endpoint called")
     return jsonify({
-        "message": "Flask AI Agent API is running",
+        "status": "running",
+        "service": "Flask AI Agent",
         "endpoints": {
-            "/health": "GET - Health check",
-            "/query": "POST - Query the AI Agent",
-            "/mcp/tools": "GET - Get available tools"
+            "/health": "GET",
+            "/query": "POST",
+            "/mcp/tools": "GET"
         }
+    }), 200
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check"""
+    logger.info("Health check called")
+    return jsonify({
+        "status": "healthy",
+        "service": "Flask AI Agent"
     }), 200
 
 @app.route('/query', methods=['POST'])
 def query_agent():
     """Query the AI Agent"""
     try:
-        data = request.get_json()
+        logger.info("Query endpoint called")
         
+        data = request.get_json()
         if not data:
-            logger.warning("Empty request body received")
+            logger.warning("Empty request body")
             return jsonify({
                 "status": "error",
                 "message": "Request body cannot be empty"
             }), 400
         
         user_message = data.get("message", "")
-        
         if not user_message:
             logger.warning("Message field missing")
             return jsonify({
@@ -67,36 +69,27 @@ def query_agent():
             }), 400
         
         if not PROJECT_ID or not AGENT_ID:
-            logger.error("GCP credentials not configured")
+            logger.error("GCP credentials not set")
             return jsonify({
                 "status": "error",
-                "message": "GCP_PROJECT_ID or AGENT_ID not configured"
+                "message": "GCP credentials not configured"
             }), 500
         
-        # Initialize client
         try:
+            logger.info("Initializing AI Platform client")
             client = aiplatform.gapic.AgentsClient()
             agent_path = client.agent_path(PROJECT_ID, LOCATION, AGENT_ID)
-        except Exception as e:
-            logger.error(f"Failed to initialize GCP client: {str(e)}")
-            return jsonify({
-                "status": "error",
-                "message": f"GCP client initialization failed: {str(e)}"
-            }), 500
-        
-        session_id = data.get("session_id", "default-session")
-        
-        logger.info(f"Query received - Message: {user_message[:100]}, Session: {session_id}")
-        
-        # Call the agent
-        try:
+            
+            session_id = data.get("session_id", f"session-{os.urandom(4).hex()}")
+            logger.info(f"Sending query to agent - Session: {session_id}")
+            
             response = client.generate_response(
                 agent=agent_path,
                 session_id=session_id,
                 input=user_message
             )
             
-            logger.info(f"Agent response generated successfully")
+            logger.info(f"Agent response received successfully")
             
             return jsonify({
                 "status": "success",
@@ -105,14 +98,14 @@ def query_agent():
             }), 200
             
         except Exception as e:
-            logger.error(f"Agent API call failed: {str(e)}")
+            logger.error(f"Agent API error: {str(e)}", exc_info=True)
             return jsonify({
                 "status": "error",
-                "message": f"Agent API call failed: {str(e)}"
+                "message": f"Agent API error: {str(e)}"
             }), 500
-        
+    
     except Exception as e:
-        logger.error(f"Unexpected error in query_agent: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         return jsonify({
             "status": "error",
             "message": str(e)
@@ -120,9 +113,9 @@ def query_agent():
 
 @app.route('/mcp/tools', methods=['GET'])
 def get_mcp_tools():
-    """Get available MCP tools"""
-    logger.info("Tools endpoint called")
-    tools = {
+    """Get MCP tools"""
+    logger.info("MCP tools endpoint called")
+    return jsonify({
         "get_products": {
             "description": "Query products from MongoDB",
             "params": ["filter"]
@@ -139,38 +132,18 @@ def get_mcp_tools():
             "description": "Check order status",
             "params": ["order_id"]
         }
-    }
-    return jsonify(tools), 200
+    }), 200
 
 @app.errorhandler(404)
-def not_found(error):
-    """Handle 404 errors"""
-    return jsonify({
-        "status": "error",
-        "message": "Endpoint not found",
-        "available_endpoints": [
-            "GET /",
-            "GET /health",
-            "POST /query",
-            "GET /mcp/tools"
-        ]
-    }), 404
+def not_found(e):
+    logger.warning(f"404 Not Found: {request.path}")
+    return jsonify({"status": "error", "message": "Endpoint not found"}), 404
 
 @app.errorhandler(500)
-def internal_error(error):
-    """Handle 500 errors"""
-    logger.error(f"Internal server error: {str(error)}", exc_info=True)
-    return jsonify({
-        "status": "error",
-        "message": "Internal server error"
-    }), 500
+def server_error(e):
+    logger.error(f"500 Server Error: {str(e)}", exc_info=True)
+    return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    logger.info(f"🚀 Starting Flask app on 0.0.0.0:{PORT}")
-    app.run(
-        host='0.0.0.0',
-        port=PORT,
-        debug=False,
-        use_reloader=False,
-        threaded=True
-    )
+    logger.info(f"🚀 Starting Flask on 0.0.0.0:{PORT}")
+    app.run(host='0.0.0.0', port=PORT, debug=False)

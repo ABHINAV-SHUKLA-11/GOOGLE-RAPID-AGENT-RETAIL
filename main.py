@@ -80,7 +80,8 @@ def query_agent():
         
         try:
             logger.info("Initializing AI Platform client")
-            client = aiplatform.gapic.AgentsClient()
+      
+client = AgentsClient(client_options={"api_endpoint": f"{LOCATION}-aiplatform.googleapis.com"})
             agent_path = client.agent_path(PROJECT_ID, LOCATION, AGENT_ID)
             
             session_id = data.get("session_id", f"session-{os.urandom(4).hex()}")

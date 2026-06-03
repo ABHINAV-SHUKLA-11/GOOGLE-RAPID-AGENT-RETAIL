@@ -43,7 +43,8 @@ def health():
     logger.info("Health check called")
     return jsonify({
         "status": "healthy",
-        "service": "Flask AI Agent"
+        "service": "Flask AI Agent",
+        "timestamp": str(os.getcwd())
     }), 200
 
 @app.route('/query', methods=['POST'])

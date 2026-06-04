@@ -10,12 +10,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Environment variables
 PORT = int(os.getenv("PORT", 8080))
 MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "retail_db")
 
-# MongoDB connection
 mongo_client = None
 db = None
 
@@ -26,40 +24,28 @@ def get_db():
         db = mongo_client[DB_NAME]
     return db
 
-# ---- AI Agent (Google AI Studio) ----
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-def query_gemini_agent(user_message, mongo_context=""):
-    import requests
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-    
-    system_prompt = f"""You are a smart retail AI agent. You help users with:
-- Finding products
-- Checking inventory
-- Creating orders
-- Tracking order status
-
-Current data from MongoDB:
-{mongo_context}
-
-Answer based on this data. Be concise and helpful."""
-
-    payload = {
-        "contents": [
-            {"role": "user", "parts": [{"text": system_prompt + "\n\nUser: " + user_message}]}
-        ]
-    }
-    
-    resp = requests.post(url, json=payload)
-    result = resp.json()
-    return result["candidates"][0]["content"]["parts"][0]["text"]
-
-# ---- Routes ----
+def smart_agent(user_message, products, orders):
+    msg = user_message.lower()
+    if any(w in msg for w in ["product", "item", "stock", "inventory", "catalogue"]):
+        if products:
+            lines = [f"- {p.get('name','?')} | Price: ${p.get('price','N/A')} | Stock: {p.get('stock','N/A')} units" for p in products]
+            return f"Here are {len(products)} products in our inventory:\n" + "\n".join(lines)
+        return "No products found in inventory. Add products using POST /products."
+    elif any(w in msg for w in ["order", "purchase", "buy", "transaction"]):
+        if orders:
+            lines = [f"- {o.get('customer','Unknown')} ordered {o.get('product','?')} x{o.get('quantity','?')} | Status: {o.get('status','processing')} | Total: ${o.get('total','N/A')}" for o in orders]
+            return f"Found {len(orders)} recent orders:\n" + "\n".join(lines)
+        return "No orders found. Create orders using POST /orders."
+    elif any(w in msg for w in ["summary", "report", "dashboard", "overview"]):
+        return f"Store Overview:\n- Total Products: {len(products)}\n- Recent Orders: {len(orders)}\n- Latest Status: {orders[0].get('status','N/A') if orders else 'No orders yet'}"
+    elif any(w in msg for w in ["hello", "hi", "help", "what"]):
+        return f"Hello! I am your Retail AI Agent powered by Google Cloud Run + MongoDB.\nI can help you with:\n- Product inventory ({len(products)} products)\n- Order management ({len(orders)} orders)\n- Store analytics\nJust ask me anything!"
+    else:
+        return f"Retail Store has {len(products)} products and {len(orders)} orders. Ask me about products, orders, or store summary!"
 
 @app.route('/', methods=['GET'])
 def root():
-    return {"status": "running", "service": "Retail AI Agent",
-            "endpoints": {"/health": "GET", "/query": "POST", "/mcp/tools": "GET"}}, 200
+    return {"status": "running", "service": "Retail AI Agent", "team": "Team Cloud Craft", "powered_by": "Google Cloud Run + MongoDB"}, 200
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -76,51 +62,37 @@ def query_agent():
         data = request.get_json()
         if not data or not data.get("message"):
             return {"status": "error", "message": "Message field is required"}, 400
-
         user_message = data["message"]
         session_id = data.get("session_id", f"session-{os.urandom(4).hex()}")
-
-        # MongoDB se context fetch karo
         database = get_db()
-        
-        # Products fetch karo
         products = list(database.products.find({}, {"_id": 0}).limit(10))
         orders = list(database.orders.find({}, {"_id": 0}).limit(5))
-        
-        mongo_context = f"Products: {json.dumps(products)}\nRecent Orders: {json.dumps(orders)}"
-        
-        # Gemini se answer lo
-        reply = query_gemini_agent(user_message, mongo_context)
-
+        reply = smart_agent(user_message, products, orders)
         return {"status": "success", "response": reply, "session_id": session_id}, 200
-
     except Exception as e:
         logger.error(f"Error: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}, 500
 
-@app.route('/mcp/tools', methods=['GET'])
-def get_mcp_tools():
-    return {
-        "get_products": {"description": "Query products from MongoDB", "params": ["filter"]},
-        "create_order": {"description": "Create order", "params": ["customer_id", "products"]},
-        "update_inventory": {"description": "Update stock", "params": ["product_id", "quantity"]},
-        "check_order_status": {"description": "Check order status", "params": ["order_id"]}
-    }, 200
-
 @app.route('/products', methods=['GET'])
 def get_products():
     try:
-        db = get_db()
-        products = list(db.products.find({}, {"_id": 0}).limit(20))
+        products = list(get_db().products.find({}, {"_id": 0}).limit(20))
         return {"status": "success", "products": products, "count": len(products)}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/products', methods=['POST'])
+def add_product():
+    try:
+        result = get_db().products.insert_one(request.get_json())
+        return {"status": "success", "product_id": str(result.inserted_id)}, 201
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
 @app.route('/orders', methods=['GET'])
 def get_orders():
     try:
-        db = get_db()
-        orders = list(db.orders.find({}, {"_id": 0}).limit(20))
+        orders = list(get_db().orders.find({}, {"_id": 0}).limit(20))
         return {"status": "success", "orders": orders}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
@@ -128,12 +100,19 @@ def get_orders():
 @app.route('/orders', methods=['POST'])
 def create_order():
     try:
-        data = request.get_json()
-        db = get_db()
-        result = db.orders.insert_one(data)
+        result = get_db().orders.insert_one(request.get_json())
         return {"status": "success", "order_id": str(result.inserted_id)}, 201
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
+
+@app.route('/mcp/tools', methods=['GET'])
+def get_mcp_tools():
+    return {
+        "get_products": {"description": "Query products from MongoDB", "params": ["filter"]},
+        "create_order": {"description": "Create new order", "params": ["customer", "product", "quantity"]},
+        "update_inventory": {"description": "Update stock levels", "params": ["product_id", "quantity"]},
+        "check_order_status": {"description": "Check order status", "params": ["order_id"]}
+    }, 200
 
 @app.errorhandler(404)
 def not_found(e):

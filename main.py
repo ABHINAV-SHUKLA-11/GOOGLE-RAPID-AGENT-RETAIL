@@ -3,6 +3,7 @@ from flask_cors import CORS
 from pymongo import MongoClient
 import os, logging, sys, json
 from bson import ObjectId
+import mimetypes
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 logger = logging.getLogger(__name__)
@@ -120,3 +121,7 @@ def not_found(e):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
+@app.route('/ui', methods=['GET'])
+def serve_ui():
+    return open('index.html').read(), 200, {'Content-Type': 'text/html'}

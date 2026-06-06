@@ -95,3 +95,26 @@ MDB_MCP_CONNECTION_STRING="your_mongodb_uri" mongodb-mcp-server
 
 ## 📄 License
 MIT License
+
+
+## ⚠️ Important Note — Product Management
+
+This agent is **customer-facing**.
+
+Customers can:
+- ✅ Browse products
+- ✅ Place orders
+- ✅ Get invoices
+- ✅ Check order status
+
+## ⚠️ Product Management
+
+
+Products can be added via:
+
+1. MongoDB Atlas (Direct)
+2. REST API → POST /products
+3. Postman / Any API Client
+
+Customers CANNOT add products.
+This is intentional security design.

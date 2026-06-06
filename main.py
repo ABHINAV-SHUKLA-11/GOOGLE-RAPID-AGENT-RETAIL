@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from pymongo import MongoClient
 import os, logging, sys, json, re
@@ -39,20 +39,57 @@ def enrich(products):
         p["reviews"] = r["reviews"]
     return products
 
+def fuzzy_match(product_name, products):
+    product_name = product_name.lower().strip()
+    # Exact match
+    for p in products:
+        if product_name in p.get("name","").lower():
+            return p
+    # Word by word match
+    words = [w for w in product_name.split() if len(w) > 2]
+    for p in products:
+        pname = p.get("name","").lower()
+        if any(w in pname for w in words):
+            return p
+    return None
+
+def make_invoice(o):
+    sub = o.get("total", 0)
+    tax = round(sub * 0.18, 2)
+    grand = round(sub + tax, 2)
+    pay = o.get("payment_method", "cash").upper()
+    pay_status = o.get("payment_status", "pending").upper()
+    return (
+        f"🧾 INVOICE\n"
+        f"{'='*30}\n"
+        f"Order ID  : {o['order_id']}\n"
+        f"Customer  : {o['customer']}\n"
+        f"Product   : {o['product']} x{o['quantity']}\n"
+        f"{'-'*30}\n"
+        f"Subtotal  : ${sub}\n"
+        f"GST (18%) : ${tax}\n"
+        f"{'='*30}\n"
+        f"GRAND TOTAL: ${grand}\n"
+        f"Payment   : {pay} (COD)\n"
+        f"Pay Status: {pay_status}\n"
+        f"Order     : {o['status'].upper()}\n"
+        f"{'='*30}\n"
+        f"Thank you for shopping with us! 🙏"
+    )
+
 def agent(msg_original, products, orders, database):
     msg = msg_original.lower().strip()
     products = enrich(products)
 
-    
-# 1. CREATE ORDER
+    # 1. CREATE ORDER
     if re.search(r'create order|place order|new order', msg):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
-        prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)  # ← FIXED
+        prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
         qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
         customer = name.group(1).strip() if name else "Walk-in"
         product_name = prod.group(1).strip() if prod else ""
         quantity = int(qty.group(1)) if qty else 1
-        matched = next((p for p in products if product_name.lower() in p.get("name","").lower()), None)
+        matched = fuzzy_match(product_name, products)
         total = round(matched["price"] * quantity, 2) if matched else 0
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
@@ -66,7 +103,20 @@ def agent(msg_original, products, orders, database):
             "created_at": datetime.now().isoformat()
         }
         database.orders.insert_one(order)
-        return f"✅ Order Created!\n- ID: {order['order_id']}\n- Customer: {customer}\n- Product: {order['product']}\n- Qty: {quantity}\n- Total: ${total}\n- Payment: Cash on Delivery\n- Status: Processing"
+        tax = round(total * 0.18, 2)
+        grand = round(total + tax, 2)
+        return (
+            f"✅ Order Created!\n"
+            f"- ID      : {order['order_id']}\n"
+            f"- Customer: {customer}\n"
+            f"- Product : {order['product']}\n"
+            f"- Qty     : {quantity}\n"
+            f"- Subtotal: ${total}\n"
+            f"- GST 18% : ${tax}\n"
+            f"- Total   : ${grand}\n"
+            f"- Payment : Cash on Delivery\n"
+            f"- Status  : Processing"
+        )
 
     # 2. DELETE ORDER
     if re.search(r'delete order|cancel order|remove order', msg):
@@ -78,9 +128,11 @@ def agent(msg_original, products, orders, database):
         name_match = re.search(r'(?:delete|cancel|remove)\s+order\s+(?:for\s+)?(.+)', msg_original, re.I)
         if name_match:
             cname = name_match.group(1).strip()
+            if len(cname) < 3:
+                return "Please provide valid customer name (min 3 characters)."
             r = database.orders.delete_many({"customer": {"$regex": cname, "$options": "i"}})
             return f"🗑️ Deleted {r.deleted_count} order(s) for {cname}!" if r.deleted_count else f"No orders for {cname}."
-        return "Specify Order ID or customer name."
+        return "Specify Order ID (e.g. ORD-001) or full customer name."
 
     # 3. UPDATE ORDER STATUS
     if re.search(r'update order|mark.*delivered|mark.*pending|mark.*processing|change status', msg):
@@ -117,7 +169,14 @@ def agent(msg_original, products, orders, database):
         delivered = len([o for o in orders if o.get("status") == "delivered"])
         processing = len([o for o in orders if o.get("status") == "processing"])
         pending = len([o for o in orders if o.get("status") == "pending"])
-        return f"💰 Revenue Report:\n- Total Revenue: ${round(total,2)}\n- Total Orders: {len(orders)}\n- Delivered: {delivered}\n- Processing: {processing}\n- Pending: {pending}"
+        return (
+            f"💰 Revenue Report:\n"
+            f"- Total Revenue: ${round(total,2)}\n"
+            f"- Total Orders : {len(orders)}\n"
+            f"- Delivered    : {delivered}\n"
+            f"- Processing   : {processing}\n"
+            f"- Pending      : {pending}"
+        )
 
     # 7. BILL/INVOICE
     if re.search(r'bill|invoice|receipt', msg):
@@ -126,23 +185,23 @@ def agent(msg_original, products, orders, database):
             oid = ord_match.group(0)
             o = next((x for x in orders if x.get("order_id") == oid), None)
             if o:
-                sub = o.get("total", 0)
-                tax = round(sub * 0.18, 2)
-                grand = round(sub + tax, 2)
-                return f"🧾 INVOICE\n{'='*30}\nOrder ID: {o['order_id']}\nCustomer: {o['customer']}\nProduct: {o['product']} x{o['quantity']}\n{'-'*30}\nSubtotal: ${sub}\nGST (18%): ${tax}\n{'='*30}\nGRAND TOTAL: ${grand}\nStatus: {o['status'].upper()}\n{'='*30}\nThank you!"
+                return make_invoice(o)
             return f"Order {oid} not found."
         name_match = re.search(r'(?:bill|invoice|receipt)\s+(?:for\s+)?(.+)', msg_original, re.I)
         if name_match:
             cname = name_match.group(1).strip()
             matched = [o for o in orders if cname.lower() in o.get("customer","").lower()]
             if matched:
-                bills = []
-                for o in matched:
-                    sub = o.get("total",0)
-                    tax = round(sub*0.18,2)
-                    grand = round(sub+tax,2)
-                    bills.append(f"- {o['order_id']} | {o['product']} | ${sub} + GST ${tax} = ${grand}")
-                return f"🧾 Bills for {cname}:\n" + "\n".join(bills)
+                if len(matched) == 1:
+                    return make_invoice(matched[0])
+                else:
+                    bills = []
+                    for o in matched:
+                        sub = o.get("total", 0)
+                        tax = round(sub * 0.18, 2)
+                        grand = round(sub + tax, 2)
+                        bills.append(f"- {o['order_id']} | {o['product']} | ${sub} + GST ${tax} = ${grand}")
+                    return f"🧾 Bills for {cname} ({len(matched)} orders):\n" + "\n".join(bills)
             return f"No orders found for {cname}."
 
     # 8. TOP RATED
@@ -192,19 +251,34 @@ def agent(msg_original, products, orders, database):
 
     # 13. WHO BOUGHT
     if re.search(r'who bought|who ordered|sales of', msg):
+        words = [w for w in msg.split() if len(w) > 3]
+        matched_product = None
         for p in products:
-            if p['name'].lower() in msg:
-                matched = [o for o in orders if p['name'].lower() in o.get("product","").lower()]
-                if matched:
-                    lines = [f"- {o['customer']} | Qty: {o['quantity']} | ${o['total']}" for o in matched]
-                    return f"🛒 {p['name']} buyers:\n" + "\n".join(lines)
+            pname = p['name'].lower()
+            if any(w in pname for w in words):
+                matched_product = p
+                break
+        if matched_product:
+            matched = [o for o in orders if matched_product['name'].lower() in o.get("product","").lower()]
+            if matched:
+                lines = [f"- {o['customer']} | Qty: {o['quantity']} | ${o['total']}" for o in matched]
+                return f"🛒 {matched_product['name']} buyers:\n" + "\n".join(lines)
+            return f"No one has bought {matched_product['name']} yet."
+        return "Please specify a product name."
 
     # 14. DASHBOARD
     if re.search(r'dashboard|summary|overview|analytics|report', msg):
         total_rev = sum(o.get("total",0) for o in orders)
         low = [p for p in products if p.get("stock",0) < 30]
         best = max(products, key=lambda x: x.get("rating",0)) if products else {}
-        return f"📊 Store Dashboard:\n- Products: {len(products)}\n- Orders: {len(orders)}\n- Revenue: ${round(total_rev,2)}\n- Low Stock: {len(low)} items\n- Top Product: {best.get('name','N/A')} ⭐{best.get('rating','')}"
+        return (
+            f"📊 Store Dashboard:\n"
+            f"- Products   : {len(products)}\n"
+            f"- Orders     : {len(orders)}\n"
+            f"- Revenue    : ${round(total_rev,2)}\n"
+            f"- Low Stock  : {len(low)} items\n"
+            f"- Top Product: {best.get('name','N/A')} ⭐{best.get('rating','')}"
+        )
 
     # 15. ALL ORDERS
     if re.search(r'all orders|show orders|list orders|orders', msg):
@@ -225,7 +299,6 @@ def agent(msg_original, products, orders, database):
         for p in products:
             if p.get('name','').lower() in msg:
                 return f"📦 {p['name']}\n- Price: ${p['price']}\n- Stock: {p['stock']} units\n- Category: {p.get('category','N/A')}\n- Rating: ⭐{p['rating']} ({p['reviews']} reviews)"
-        # Try partial match
         words = msg.split()
         for word in words:
             if len(word) > 3:
@@ -234,46 +307,73 @@ def agent(msg_original, products, orders, database):
                     return f"📦 {matched['name']}\n- Price: ${matched['price']}\n- Stock: {matched['stock']} units\n- Category: {matched.get('category','N/A')}\n- Rating: ⭐{matched['rating']} ({matched['reviews']} reviews)"
         return "Product not found. Type 'show all products' to see available items."
 
+    # 17A. PAYMENT METHOD
+    if re.search(r'payment method|how to pay|payment options|pay by|payment mode', msg):
+        return (
+            "💳 Payment Options:\n\n"
+            "💵 Cash on Delivery (COD)\n"
+            "- Pay when order arrives\n"
+            "- No extra charges\n\n"
+            "💳 Card Payment\n"
+            "- Debit/Credit Card accepted\n"
+            "- Visa, Mastercard, Rupay\n\n"
+            "📱 UPI Payment\n"
+            "- Google Pay, PhonePe, Paytm\n"
+            "- Instant payment\n"
+        )
 
+    # 17B. PAYMENT STATUS
+    if re.search(r'payment status|is payment done|payment pending|payment complete', msg):
+        ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
+        if ord_match:
+            oid = ord_match.group(0)
+            o = next((x for x in orders if x.get("order_id") == oid), None)
+            if o:
+                return (
+                    f"💳 Payment Status for {oid}:\n"
+                    f"- Customer      : {o.get('customer','?')}\n"
+                    f"- Total         : ${o.get('total','?')}\n"
+                    f"- Payment Method: {o.get('payment_method','Cash').upper()}\n"
+                    f"- Payment Status: {o.get('payment_status','Pending').upper()}\n"
+                    f"- Order Status  : {o.get('status','?').upper()}"
+                )
+            return f"Order {oid} not found."
+        return "Please specify Order ID (e.g. 'payment status ORD-001')"
 
-
-    
-
-
-    
     # 17. HELLO/HELP
     if re.search(r'hello|hi|help|what can you', msg):
-        return """👋 Hello! I am your Retail AI Agent!
-
-🔍 PRODUCTS:
-- show all products
-- products under $100
-- top rated products
-- show shoes / clothing
-- rating above 4.5
-
-🛒 ORDERS:
-- show all orders
-- orders for [customer name]
-- create order for [name] product [item] qty [n]
-- delete order [ORD-ID or customer name]
-- mark ORD-001 as delivered
-
-🧾 BILLING:
-- bill for [customer name]
-- bill for ORD-001
-
-📊 ANALYTICS:
-- revenue report
-- store dashboard
-- low stock alerts
-- who bought Nike Air Max
-
-Ask me anything!"""
+        return (
+            "👋 Hello! I am your Retail AI Agent!\n\n"
+            "🔍 PRODUCTS:\n"
+            "- show all products\n"
+            "- products under $100\n"
+            "- top rated products\n"
+            "- show shoes / clothing\n"
+            "- rating above 4.5\n\n"
+            "🛒 ORDERS:\n"
+            "- show all orders\n"
+            "- orders for [customer name]\n"
+            "- create order for [name] product [item] qty [n]\n"
+            "- delete order [ORD-ID or customer name]\n"
+            "- mark ORD-001 as delivered\n\n"
+            "🧾 BILLING:\n"
+            "- bill for [customer name]\n"
+            "- bill for ORD-001\n\n"
+            "💳 PAYMENTS:\n"
+            "- payment method\n"
+            "- payment status ORD-001\n\n"
+            "📊 ANALYTICS:\n"
+            "- revenue report\n"
+            "- store dashboard\n"
+            "- low stock alerts\n"
+            "- who bought Nike Air Max\n\n"
+            "Ask me anything!"
+        )
 
     # DEFAULT
     total_rev = sum(o.get("total",0) for o in orders)
     return f"🏪 Store: {len(products)} products | {len(orders)} orders | Revenue: ${round(total_rev,2)}\nType 'help' to see all commands!"
+
 
 @app.route('/', methods=['GET'])
 def root():

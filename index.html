@@ -1,741 +1,120 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Retail AI Agent - Team Cloud Craft</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-:root {
-  --bg: #0a0a0f;
-  --surface: #111118;
-  --surface2: #16161f;
-  --border: rgba(255,255,255,0.07);
-  --border-hover: rgba(255,255,255,0.14);
-  --accent: #6ee7b7;
-  --accent2: #818cf8;
-  --accent3: #fb923c;
-  --text: #f0f0f8;
-  --muted: #6b6b80;
-  --muted2: #9090a8;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Ambient background */
-body::before {
-  content: '';
-  position: fixed;
-  top: -30%;
-  left: -10%;
-  width: 60%;
-  height: 60%;
-  background: radial-gradient(ellipse, rgba(110,231,183,0.04) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-body::after {
-  content: '';
-  position: fixed;
-  bottom: -20%;
-  right: -10%;
-  width: 50%;
-  height: 50%;
-  background: radial-gradient(ellipse, rgba(129,140,248,0.05) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* HEADER */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(10,10,15,0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  padding: 0 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(110,231,183,0.2), rgba(129,140,248,0.2));
-  border: 1px solid rgba(110,231,183,0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-}
-
-.logo-text {
-  font-family: 'Syne', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.logo-sub {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 300;
-  margin-top: 1px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--accent);
-  background: rgba(110,231,183,0.08);
-  border: 1px solid rgba(110,231,183,0.2);
-  padding: 5px 12px;
-  border-radius: 100px;
-  font-weight: 500;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 2s infinite;
-  box-shadow: 0 0 6px var(--accent);
-}
-
-@keyframes pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50% { opacity:0.5; transform:scale(0.8); }
-}
-
-/* MAIN LAYOUT */
-.main {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 16px;
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-}
-
-/* METRICS */
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.metric-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.2s, transform 0.2s;
-  animation: fadeUp 0.5s ease both;
-}
-
-.metric-card:nth-child(1) { animation-delay: 0.05s; }
-.metric-card:nth-child(2) { animation-delay: 0.1s; }
-.metric-card:nth-child(3) { animation-delay: 0.15s; }
-
-.metric-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
-}
-
-.metric-card::before {
-  content: '';
-  position: absolute;
-  top: 0; right: 0;
-  width: 80px; height: 80px;
-  border-radius: 50%;
-  filter: blur(30px);
-  opacity: 0.25;
-}
-.metric-card:nth-child(1)::before { background: var(--accent); }
-.metric-card:nth-child(2)::before { background: var(--accent2); }
-.metric-card:nth-child(3)::before { background: var(--accent3); }
-
-.metric-icon {
-  font-size: 20px;
-  margin-bottom: 10px;
-  display: block;
-}
-
-.metric-label {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-
-.metric-value {
-  font-family: 'Syne', sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.metric-card:nth-child(1) .metric-value { color: var(--accent); }
-.metric-card:nth-child(2) .metric-value { color: var(--accent2); }
-.metric-card:nth-child(3) .metric-value { color: var(--accent3); }
-
-/* PANELS */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  animation: fadeUp 0.5s ease both;
-  animation-delay: 0.2s;
-}
-
-.panel-header {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text);
-}
-
-.panel-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 100px;
-  background: var(--surface2);
-  color: var(--muted2);
-  border: 1px solid var(--border);
-}
-
-/* PRODUCTS */
-.products-list { padding: 8px; }
-
-.product-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin-bottom: 4px;
-  transition: background 0.15s;
-  cursor: default;
-}
-
-.product-item:hover { background: var(--surface2); }
-
-.product-left { display: flex; align-items: center; gap: 10px; }
-
-.product-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(110,231,183,0.15), rgba(129,140,248,0.15));
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-.product-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.product-cat {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 1px;
-}
-
-.product-right { text-align: right; }
-
-.product-price {
-  font-family: 'Syne', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.stock-badge {
-  font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 100px;
-  background: rgba(110,231,183,0.1);
-  color: var(--accent);
-  border: 1px solid rgba(110,231,183,0.2);
-  margin-top: 3px;
-  display: inline-block;
-}
-
-/* ORDERS */
-.orders-list { padding: 8px; }
-
-.order-item {
-  padding: 11px 13px;
-  border-radius: 10px;
-  margin-bottom: 6px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  transition: border-color 0.15s;
-}
-
-.order-item:hover { border-color: var(--border-hover); }
-
-.order-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.order-customer {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.order-status {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 100px;
-  background: rgba(251,146,60,0.12);
-  color: var(--accent3);
-  border: 1px solid rgba(251,146,60,0.25);
-  font-weight: 500;
-}
-
-.order-detail {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-/* CHAT PANEL */
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 100px);
-  min-height: 520px;
-  max-height: 720px;
-  position: sticky;
-  top: 76px;
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--surface2) transparent;
-}
-
-.chat-messages::-webkit-scrollbar { width: 4px; }
-.chat-messages::-webkit-scrollbar-track { background: transparent; }
-.chat-messages::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
-
-.msg {
-  max-width: 88%;
-  padding: 10px 13px;
-  border-radius: 13px;
-  font-size: 13px;
-  line-height: 1.55;
-  animation: msgIn 0.25s ease both;
-}
-
-@keyframes msgIn {
-  from { opacity:0; transform:translateY(8px) scale(0.97); }
-  to { opacity:1; transform:translateY(0) scale(1); }
-}
-
-.msg-bot {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  align-self: flex-start;
-  border-bottom-left-radius: 4px;
-}
-
-.msg-user {
-  background: linear-gradient(135deg, rgba(110,231,183,0.15), rgba(129,140,248,0.15));
-  border: 1px solid rgba(110,231,183,0.2);
-  color: var(--text);
-  align-self: flex-end;
-  border-bottom-right-radius: 4px;
-}
-
-/* Typing */
-.typing {
-  display: flex;
-  gap: 4px;
-  padding: 12px 14px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  border-bottom-left-radius: 4px;
-  align-self: flex-start;
-  width: fit-content;
-}
-
-.typing span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--muted);
-  animation: bounce 1.2s infinite;
-}
-.typing span:nth-child(2) { animation-delay: 0.2s; }
-.typing span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes bounce {
-  0%,60%,100% { transform:translateY(0); opacity:0.5; }
-  30% { transform:translateY(-6px); opacity:1; }
-}
-
-/* Quick buttons */
-.quick-btns {
-  padding: 10px 14px 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.quick-btn {
-  font-size: 11px;
-  font-family: 'DM Sans', sans-serif;
-  padding: 5px 11px;
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  background: transparent;
-  color: var(--muted2);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.quick-btn:hover {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--border-hover);
-}
-
-/* Input area */
-.chat-input-area {
-  padding: 12px 14px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.chat-input {
-  flex: 1;
-  padding: 9px 13px;
-  font-size: 13px;
-  font-family: 'DM Sans', sans-serif;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  outline: none;
-  color: var(--text);
-  transition: border-color 0.15s;
-}
-
-.chat-input::placeholder { color: var(--muted); }
-.chat-input:focus { border-color: rgba(110,231,183,0.35); }
-
-.send-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(110,231,183,0.2), rgba(129,140,248,0.2));
-  border: 1px solid rgba(110,231,183,0.25);
-  cursor: pointer;
-  color: var(--accent);
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-
-.send-btn:hover {
-  background: rgba(110,231,183,0.25);
-  transform: scale(1.05);
-}
-
-/* Loading skeleton */
-.skeleton {
-  height: 14px;
-  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Animations */
-@keyframes fadeUp {
-  from { opacity:0; transform:translateY(16px); }
-  to { opacity:1; transform:translateY(0); }
-}
-
-/* Divider between panels */
-.panel-gap { margin-bottom: 14px; }
-
-/* Empty state */
-.empty-state {
-  padding: 24px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .main { grid-template-columns: 1fr; }
-  .metrics { grid-template-columns: repeat(3, 1fr); }
-  .chat-panel { height: 480px; position: static; }
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f0; min-height: 100vh; }
+  .header { background: white; border-bottom: 1px solid #e5e5e5; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: #e6f1fb; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo-text { font-size: 16px; font-weight: 500; }
+  .logo-sub { font-size: 12px; color: #888; }
+  .status-badge { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #16a34a; background: #f0fdf4; padding: 4px 12px; border-radius: 8px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .main { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px; max-width: 1100px; margin: 0 auto; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .metric-card { background: #f0f0eb; border-radius: 8px; padding: 14px 16px; }
+  .metric-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .metric-value { font-size: 24px; font-weight: 500; }
+  .panel { background: white; border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; }
+  .panel-header { padding: 14px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 8px; }
+  .panel-title { font-size: 14px; font-weight: 500; }
+  .products-list { padding: 8px; }
+  .product-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; }
+  .product-item:hover { background: #f5f5f0; }
+  .product-name { font-size: 13px; font-weight: 500; }
+  .product-cat { font-size: 11px; color: #888; }
+  .stock-badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #f0fdf4; color: #16a34a; }
+  .orders-list { padding: 8px; }
+  .order-item { padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; border: 1px solid #e5e5e5; }
+  .order-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .order-status { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #fffbeb; color: #d97706; }
+  .chat-panel { display: flex; flex-direction: column; height: 520px; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+  .msg-bot { background: #f5f5f0; align-self: flex-start; }
+  .msg-user { background: #e6f1fb; color: #185fa5; align-self: flex-end; }
+  .typing { display: flex; gap: 4px; padding: 12px; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: #888; animation: bounce 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+  .chat-input-area { padding: 12px; border-top: 1px solid #e5e5e5; display: flex; gap: 8px; }
+  .chat-input { flex: 1; padding: 8px 12px; font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; outline: none; }
+  .send-btn { width: 34px; height: 34px; border-radius: 8px; background: #e6f1fb; border: none; cursor: pointer; color: #185fa5; }
+  .quick-btns { padding: 0 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .quick-btn { font-size: 11px; padding: 4px 10px; border: 1px solid #e5e5e5; border-radius: 6px; background: transparent; color: #888; cursor: pointer; }
+  .quick-btn:hover { background: #f5f5f0; }
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
 <div class="header">
   <div class="logo">
-    <div class="logo-icon">🛍️</div>
+    <div class="logo-icon">🏪</div>
     <div>
       <div class="logo-text">Retail AI Agent</div>
-      <div class="logo-sub">Team Cloud Craft · Cloud Run + MongoDB</div>
+      <div class="logo-sub">Team Cloud Craft · Google Cloud Run + MongoDB</div>
     </div>
   </div>
-  <div class="header-right">
-    <div class="status-badge">
-      <div class="dot"></div>
-      Live
-    </div>
-  </div>
+  <div class="status-badge"><div class="dot"></div>Live on Cloud Run</div>
 </div>
-
-<!-- MAIN -->
 <div class="main">
-
-  <!-- LEFT COLUMN -->
   <div>
-
-    <!-- METRICS -->
     <div class="metrics">
-      <div class="metric-card">
-        <span class="metric-icon">📦</span>
-        <div class="metric-label">Total Products</div>
-        <div class="metric-value" id="prod-count">—</div>
-      </div>
-      <div class="metric-card">
-        <span class="metric-icon">🛒</span>
-        <div class="metric-label">Recent Orders</div>
-        <div class="metric-value" id="order-count">—</div>
-      </div>
-      <div class="metric-card">
-        <span class="metric-icon">💰</span>
-        <div class="metric-label">Revenue</div>
-        <div class="metric-value">$259</div>
-      </div>
+      <div class="metric-card"><div class="metric-label">Total Products</div><div class="metric-value" id="prod-count">3</div></div>
+      <div class="metric-card"><div class="metric-label">Recent Orders</div><div class="metric-value" id="order-count">1</div></div>
+      <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">$259</div></div>
     </div>
-
-    <!-- PRODUCTS -->
-    <div class="panel panel-gap">
-      <div class="panel-header">
-        <span class="panel-title">Product Inventory</span>
-        <span class="panel-badge" id="prod-badge">Loading</span>
-      </div>
-      <div class="products-list" id="products-list">
-        <div style="padding:12px">
-          <div class="skeleton" style="width:70%"></div>
-          <div class="skeleton" style="width:50%"></div>
-          <div class="skeleton" style="width:60%"></div>
-        </div>
-      </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header"><span class="panel-title">Product Inventory</span></div>
+      <div class="products-list" id="products-list">Loading...</div>
     </div>
-
-    <!-- ORDERS -->
     <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Recent Orders</span>
-        <span class="panel-badge" id="order-badge">Loading</span>
-      </div>
-      <div class="orders-list" id="orders-list">
-        <div style="padding:12px">
-          <div class="skeleton" style="width:60%"></div>
-          <div class="skeleton" style="width:40%"></div>
-        </div>
-      </div>
+      <div class="panel-header"><span class="panel-title">Recent Orders</span></div>
+      <div class="orders-list" id="orders-list">Loading...</div>
     </div>
-
   </div>
-
-  <!-- RIGHT: CHAT -->
   <div class="panel chat-panel">
-    <div class="panel-header">
-      <span class="panel-title">AI Agent Chat</span>
-      <span class="panel-badge">GPT-powered</span>
-    </div>
-
+    <div class="panel-header"><span class="panel-title">AI Agent Chat</span></div>
     <div class="chat-messages" id="chat">
-      <div class="msg msg-bot">
-        Hello! I'm your Retail AI Agent. Ask me about products, orders, or analytics! 👋
-      </div>
+      <div class="msg msg-bot">Hello! I am your Retail AI Agent. Ask me about products, orders, or analytics!</div>
     </div>
-
     <div class="quick-btns">
-      <button class="quick-btn" onclick="sendMsg('Show me all products')">📦 Products</button>
-      <button class="quick-btn" onclick="sendMsg('Show me all orders')">🛒 Orders</button>
-      <button class="quick-btn" onclick="sendMsg('Store summary')">📊 Summary</button>
-      <button class="quick-btn" onclick="sendMsg('Top selling products')">🔥 Top Sellers</button>
+      <button class="quick-btn" onclick="sendMsg('Show me all products')">All products</button>
+      <button class="quick-btn" onclick="sendMsg('Show me all orders')">All orders</button>
+      <button class="quick-btn" onclick="sendMsg('Store summary')">Summary</button>
     </div>
-
     <div class="chat-input-area">
       <input class="chat-input" id="msg-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendMsg()" />
-      <button class="send-btn" onclick="sendMsg()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
+      <button class="send-btn" onclick="sendMsg()">➤</button>
     </div>
   </div>
-
 </div>
-
 <script>
 const API = 'https://google-rapid-agent-retail-44551099700.europe-west1.run.app';
 const chat = document.getElementById('chat');
 
-const categoryEmoji = {
-  electronics: '💻', food: '🍎', clothing: '👕', furniture: '🪑',
-  books: '📚', sports: '⚽', beauty: '💄', toys: '🧸', general: '🏷️'
-};
+fetch(API+'/products').then(r=>r.json()).then(d=>{
+  document.getElementById('prod-count').textContent = d.count || 0;
+  const list = document.getElementById('products-list');
+  list.innerHTML = d.products.map(p=>`<div class="product-item"><div><div class="product-name">${p.name}</div><div class="product-cat">${p.category||'General'}</div></div><div><div style="font-weight:500">$${p.price}</div><span class="stock-badge">${p.stock} units</span></div></div>`).join('');
+});
 
-// Fetch Products
-fetch(API + '/products')
-  .then(r => r.json())
-  .then(d => {
-    const count = d.count || d.products?.length || 0;
-    document.getElementById('prod-count').textContent = count;
-    document.getElementById('prod-badge').textContent = count + ' items';
-    const list = document.getElementById('products-list');
-    if (!d.products || d.products.length === 0) {
-      list.innerHTML = '<div class="empty-state">No products found</div>';
-      return;
-    }
-    list.innerHTML = d.products.map(p => {
-      const cat = (p.category || 'general').toLowerCase();
-      const emoji = categoryEmoji[cat] || '🏷️';
-      return `<div class="product-item">
-        <div class="product-left">
-          <div class="product-avatar">${emoji}</div>
-          <div>
-            <div class="product-name">${p.name}</div>
-            <div class="product-cat">${p.category || 'General'}</div>
-          </div>
-        </div>
-        <div class="product-right">
-          <div class="product-price">$${p.price}</div>
-          <span class="stock-badge">${p.stock} in stock</span>
-        </div>
-      </div>`;
-    }).join('');
-  })
-  .catch(() => {
-    document.getElementById('products-list').innerHTML = '<div class="empty-state">Failed to load products</div>';
-  });
+fetch(API+'/orders').then(r=>r.json()).then(d=>{
+  document.getElementById('order-count').textContent = d.orders.length || 0;
+  const list = document.getElementById('orders-list');
+  list.innerHTML = d.orders.map(o=>`<div class="order-item"><div class="order-top"><span style="font-size:13px;font-weight:500">${o.customer||'Customer'}</span><span class="order-status">${o.status||'processing'}</span></div><div style="font-size:12px;color:#888">${o.product||'Product'} x${o.quantity||1} · $${o.total||0}</div></div>`).join('') || '<div style="padding:12px;color:#888;font-size:13px">No orders yet</div>';
+});
 
-// Fetch Orders
-fetch(API + '/orders')
-  .then(r => r.json())
-  .then(d => {
-    const orders = d.orders || [];
-    document.getElementById('order-count').textContent = orders.length;
-    document.getElementById('order-badge').textContent = orders.length + ' orders';
-    const list = document.getElementById('orders-list');
-    if (orders.length === 0) {
-      list.innerHTML = '<div class="empty-state">No orders yet</div>';
-      return;
-    }
-    list.innerHTML = orders.map(o => `
-      <div class="order-item">
-        <div class="order-top">
-          <span class="order-customer">${o.customer || 'Customer'}</span>
-          <span class="order-status">${o.status || 'processing'}</span>
-        </div>
-        <div class="order-detail">${o.product || 'Product'} × ${o.quantity || 1} &nbsp;·&nbsp; <strong style="color:var(--accent3)">$${o.total || 0}</strong></div>
-      </div>`).join('');
-  })
-  .catch(() => {
-    
- 
- 
-     
-         .getElementById('orders-list').innerHTML = '<div class="empty-state">Failed to load orders</div>';
-  });
-
-// Chat
 function addMsg(text, isUser) {
   const d = document.createElement('div');
-  d.className = 'msg ' + (isUser ? 'msg-user' : 'msg-bot');
-  d.innerHTML = text.replace(/\n/g, '<br>');
+  d.className = 'msg '+(isUser?'msg-user':'msg-bot');
+  d.innerHTML = text.replace(/\n/g,'<br>');
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -743,31 +122,25 @@ function addMsg(text, isUser) {
 async function sendMsg(preset) {
   const input = document.getElementById('msg-input');
   const msg = preset || input.value.trim();
-  if (!msg) return;
+  if(!msg) return;
   input.value = '';
   addMsg(msg, true);
-
   const t = document.createElement('div');
-  t.className = 'typing';
-  t.id = 'typing';
-  t.innerHTML = '<span></span><span></span><span></span>';
+  t.className='typing'; t.id='typing';
+  t.innerHTML='<span></span><span></span><span></span>';
   chat.appendChild(t);
-  chat.scrollTop = chat.scrollHeight;
-
   try {
-    const res = await fetch(API + '/query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg })
-    });
+    const res = await fetch(API+'/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:msg})});
     const data = await res.json();
     document.getElementById('typing')?.remove();
-    addMsg(data.response || 'No response', false);
-  } catch (e) {
+    addMsg(data.response||'Error', false);
+  } catch(e) {
     document.getElementById('typing')?.remove();
-    addMsg('⚠️ Connection error. Please try again.', false);
+    addMsg('Connection error.', false);
   }
 }
 </script>
 </body>
 </html>
+
+

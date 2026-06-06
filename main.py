@@ -44,6 +44,7 @@ def agent(msg_original, products, orders, database):
     products = enrich(products)
 
     # 1. CREATE ORDER
+# 1. CREATE ORDER
     if re.search(r'create order|place order|new order', msg):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
         prod = re.search(r'product\s+(.+?)\s+qty', msg_original, re.I)
@@ -60,11 +61,12 @@ def agent(msg_original, products, orders, database):
             "quantity": quantity,
             "status": "processing",
             "total": total,
+            "payment_method": "cash",     # ← ADDED
+            "payment_status": "pending",  # ← ADDED
             "created_at": datetime.now().isoformat()
         }
         database.orders.insert_one(order)
-        return f"✅ Order Created!\n- ID: {order['order_id']}\n- Customer: {customer}\n- Product: {order['product']}\n- Qty: {quantity}\n- Total: ${total}\n- Status: Processing"
-
+        return f"✅ Order Created!\n- ID: {order['order_id']}\n- Customer: {customer}\n- Product: {order['product']}\n- Qty: {quantity}\n- Total: ${total}\n- Payment: Cash on Delivery\n- Status: Processing"
     # 2. DELETE ORDER
     if re.search(r'delete order|cancel order|remove order', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())

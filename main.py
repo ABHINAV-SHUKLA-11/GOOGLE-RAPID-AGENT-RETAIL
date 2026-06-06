@@ -231,6 +231,27 @@ def agent(msg_original, products, orders, database):
                     return f"📦 {matched['name']}\n- Price: ${matched['price']}\n- Stock: {matched['stock']} units\n- Category: {matched.get('category','N/A')}\n- Rating: ⭐{matched['rating']} ({matched['reviews']} reviews)"
         return "Product not found. Type 'show all products' to see available items."
 
+
+
+# 17A. PAYMENT METHOD
+    if re.search(r'payment method|how to pay|payment options|pay by|payment mode', msg):
+        return """💳 Payment Options:\n\n💵 Cash on Delivery (COD)\n- Pay when order arrives\n- No extra charges\n\n💳 Card Payment\n- Debit/Credit Card accepted\n- Visa, Mastercard, Rupay\n\n📱 UPI Payment\n- Google Pay, PhonePe, Paytm\n- Instant payment\n\nTo specify payment:\n'create order for [name] product [item] qty [n] pay by cash'\n'create order for [name] product [item] qty [n] pay by card'\n'create order for [name] product [item] qty [n] pay by upi'"""
+
+    # 17B. PAYMENT STATUS
+    if re.search(r'payment status|is payment done|payment pending|payment complete', msg):
+        ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
+        if ord_match:
+            oid = ord_match.group(0)
+            o = next((x for x in orders if x.get("order_id") == oid), None)
+            if o:
+                return f"💳 Payment Status for {oid}:\n- Customer: {o.get('customer','?')}\n- Total: ${o.get('total','?')}\n- Payment Method: {o.get('payment_method','Cash').upper()}\n- Payment Status: {o.get('payment_status','Pending').upper()}\n- Order Status: {o.get('status','?').upper()}"
+            return f"Order {oid} not found."
+        return "Please specify Order ID (e.g. 'payment status ORD-001')"
+
+    
+
+
+    
     # 17. HELLO/HELP
     if re.search(r'hello|hi|help|what can you', msg):
         return """👋 Hello! I am your Retail AI Agent!

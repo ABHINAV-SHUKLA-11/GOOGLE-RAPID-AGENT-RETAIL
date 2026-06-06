@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,6 +51,8 @@
   .quick-btns { padding: 0 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
   .quick-btn { font-size: 11px; padding: 4px 10px; border: 1px solid #e5e5e5; border-radius: 6px; background: transparent; color: #888; cursor: pointer; }
   .quick-btn:hover { background: #f5f5f0; }
+  .print-btn { margin-top: 8px; padding: 6px 14px; background: #185fa5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; display: block; }
+  .print-btn:hover { background: #1a4f8a; }
 </style>
 </head>
 <body>
@@ -66,9 +69,9 @@
 <div class="main">
   <div>
     <div class="metrics">
-      <div class="metric-card"><div class="metric-label">Total Products</div><div class="metric-value" id="prod-count">3</div></div>
-      <div class="metric-card"><div class="metric-label">Recent Orders</div><div class="metric-value" id="order-count">1</div></div>
-      <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value">$259</div></div>
+      <div class="metric-card"><div class="metric-label">Total Products</div><div class="metric-value" id="prod-count">-</div></div>
+      <div class="metric-card"><div class="metric-label">Recent Orders</div><div class="metric-value" id="order-count">-</div></div>
+      <div class="metric-card"><div class="metric-label">Revenue</div><div class="metric-value" id="revenue">-</div></div>
     </div>
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-header"><span class="panel-title">Product Inventory</span></div>
@@ -80,14 +83,17 @@
     </div>
   </div>
   <div class="panel chat-panel">
-    <div class="panel-header"><span class="panel-title">AI Agent Chat</span></div>
+    <div class="panel-header"><span class="panel-title">🤖 AI Agent Chat</span></div>
     <div class="chat-messages" id="chat">
-      <div class="msg msg-bot">Hello! I am your Retail AI Agent. Ask me about products, orders, or analytics!</div>
+      <div class="msg msg-bot">👋 Hello! I am your Retail AI Agent.<br><br>Try:<br>• show all products<br>• revenue report<br>• bill for John Doe<br>• low stock alerts</div>
     </div>
     <div class="quick-btns">
-      <button class="quick-btn" onclick="sendMsg('Show me all products')">All products</button>
-      <button class="quick-btn" onclick="sendMsg('Show me all orders')">All orders</button>
-      <button class="quick-btn" onclick="sendMsg('Store summary')">Summary</button>
+      <button class="quick-btn" onclick="sendMsg('show all products')">Products</button>
+      <button class="quick-btn" onclick="sendMsg('show all orders')">Orders</button>
+      <button class="quick-btn" onclick="sendMsg('revenue report')">Revenue</button>
+      <button class="quick-btn" onclick="sendMsg('store dashboard')">Dashboard</button>
+      <button class="quick-btn" onclick="sendMsg('low stock alerts')">Low Stock</button>
+      <button class="quick-btn" onclick="sendMsg('top rated products')">Top Rated</button>
     </div>
     <div class="chat-input-area">
       <input class="chat-input" id="msg-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendMsg()" />
@@ -99,22 +105,88 @@
 const API = 'https://google-rapid-agent-retail-44551099700.europe-west1.run.app';
 const chat = document.getElementById('chat');
 
+// Load products
 fetch(API+'/products').then(r=>r.json()).then(d=>{
   document.getElementById('prod-count').textContent = d.count || 0;
   const list = document.getElementById('products-list');
-  list.innerHTML = d.products.map(p=>`<div class="product-item"><div><div class="product-name">${p.name}</div><div class="product-cat">${p.category||'General'}</div></div><div><div style="font-weight:500">$${p.price}</div><span class="stock-badge">${p.stock} units</span></div></div>`).join('');
+  list.innerHTML = d.products.map(p=>`
+    <div class="product-item">
+      <div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-cat">${p.category||'General'}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:500">$${p.price}</div>
+        <span class="stock-badge">${p.stock} units</span>
+      </div>
+    </div>`).join('');
 });
 
+// Load orders + calculate revenue
 fetch(API+'/orders').then(r=>r.json()).then(d=>{
   document.getElementById('order-count').textContent = d.orders.length || 0;
+  const revenue = d.orders.reduce((sum, o) => sum + (o.total || 0), 0);
+  document.getElementById('revenue').textContent = '$' + revenue.toFixed(2);
   const list = document.getElementById('orders-list');
-  list.innerHTML = d.orders.map(o=>`<div class="order-item"><div class="order-top"><span style="font-size:13px;font-weight:500">${o.customer||'Customer'}</span><span class="order-status">${o.status||'processing'}</span></div><div style="font-size:12px;color:#888">${o.product||'Product'} x${o.quantity||1} · $${o.total||0}</div></div>`).join('') || '<div style="padding:12px;color:#888;font-size:13px">No orders yet</div>';
+  list.innerHTML = d.orders.map(o=>`
+    <div class="order-item">
+      <div class="order-top">
+        <span style="font-size:13px;font-weight:500">${o.customer||'Customer'}</span>
+        <span class="order-status">${o.status||'processing'}</span>
+      </div>
+      <div style="font-size:12px;color:#888">${o.product||'Product'} x${o.quantity||1} · $${o.total||0}</div>
+    </div>`).join('') || '<div style="padding:12px;color:#888;font-size:13px">No orders yet</div>';
 });
+
+function isBill(text) {
+  return text.includes('INVOICE') || text.includes('GRAND TOTAL') || text.includes('Bills for');
+}
+
+function printBill(billText) {
+  const clean = billText.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Invoice - Retail AI Agent</title>
+  <style>
+    body { font-family: monospace; padding: 40px; max-width: 420px; margin: 0 auto; }
+    h2 { text-align: center; margin-bottom: 4px; }
+    h4 { text-align: center; color: #888; margin-bottom: 20px; }
+    .bill { white-space: pre-wrap; font-size: 14px; line-height: 2; background: #f9f9f9; padding: 16px; border-radius: 8px; }
+    .footer { text-align: center; margin-top: 20px; color: #888; font-size: 12px; }
+    .print-btn { width: 100%; padding: 12px; background: #185fa5; color: white; border: none; cursor: pointer; font-size: 15px; border-radius: 6px; margin-top: 16px; }
+    @media print { .print-btn { display: none; } }
+  </style>
+</head>
+<body>
+  <h2>🏪 Retail AI Agent</h2>
+  <h4>Team Cloud Craft</h4>
+  <div class="bill">${clean}</div>
+  <div class="footer">
+    <p>Powered by Google Cloud Run + MongoDB</p>
+    <p>Generated: ${new Date().toLocaleString()}</p>
+  </div>
+  <button class="print-btn" onclick="window.print()">🖨️ Print Invoice</button>
+</body>
+</html>`);
+  win.document.close();
+  win.focus();
+}
 
 function addMsg(text, isUser) {
   const d = document.createElement('div');
-  d.className = 'msg '+(isUser?'msg-user':'msg-bot');
-  d.innerHTML = text.replace(/\n/g,'<br>');
+  d.className = 'msg ' + (isUser ? 'msg-user' : 'msg-bot');
+  d.innerHTML = text.replace(/\n/g, '<br>');
+
+  if (!isUser && isBill(text)) {
+    const btn = document.createElement('button');
+    btn.className = 'print-btn';
+    btn.innerHTML = '🖨️ Print Invoice';
+    btn.onclick = () => printBill(d.innerHTML);
+    d.appendChild(btn);
+  }
+
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -122,25 +194,33 @@ function addMsg(text, isUser) {
 async function sendMsg(preset) {
   const input = document.getElementById('msg-input');
   const msg = preset || input.value.trim();
-  if(!msg) return;
+  if (!msg) return;
   input.value = '';
   addMsg(msg, true);
   const t = document.createElement('div');
-  t.className='typing'; t.id='typing';
-  t.innerHTML='<span></span><span></span><span></span>';
+  t.className = 'typing'; t.id = 'typing';
+  t.innerHTML = '<span></span><span></span><span></span>';
   chat.appendChild(t);
+  chat.scrollTop = chat.scrollHeight;
   try {
-    const res = await fetch(API+'/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:msg})});
+    const res = await fetch(API+'/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg})
+    });
     const data = await res.json();
     document.getElementById('typing')?.remove();
-    addMsg(data.response||'Error', false);
+    addMsg(data.response || 'Error', false);
+
+    // Refresh data after order operations
+    if (msg.toLowerCase().includes('create order') || msg.toLowerCase().includes('delete order')) {
+      setTimeout(() => location.reload(), 2000);
+    }
   } catch(e) {
     document.getElementById('typing')?.remove();
-    addMsg('Connection error.', false);
+    addMsg('Connection error. Please try again.', false);
   }
 }
 </script>
 </body>
 </html>
-
-

@@ -118,3 +118,11 @@ Products can be added via:
 
 Customers CANNOT add products.
 This is intentional security design.
+
+
+## 🔮 Future Scope
+- Razorpay payment gateway integration
+- Customer login/authentication
+- Multi-store support
+- WhatsApp bot integration
+- Email invoice delivery

@@ -61,12 +61,10 @@ def agent(msg_original, products, orders, database):
             "quantity": quantity,
             "status": "processing",
             "total": total,
-            "payment_method": "cash",     # ← ADDED
-            "payment_status": "pending",  # ← ADDED
             "created_at": datetime.now().isoformat()
         }
         database.orders.insert_one(order)
-        return f"✅ Order Created!\n- ID: {order['order_id']}\n- Customer: {customer}\n- Product: {order['product']}\n- Qty: {quantity}\n- Total: ${total}\n- Payment: Cash on Delivery\n- Status: Processing"
+        return f"✅ Order Created!\n- ID: {order['order_id']}\n- Customer: {customer}\n- Product: {order['product']}\n- Qty: {quantity}\n- Total: ${total}\n- Status: Processing"
     # 2. DELETE ORDER
     if re.search(r'delete order|cancel order|remove order', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
@@ -235,20 +233,6 @@ def agent(msg_original, products, orders, database):
 
 
 
-# 17A. PAYMENT METHOD
-    if re.search(r'payment method|how to pay|payment options|pay by|payment mode', msg):
-        return """💳 Payment Options:\n\n💵 Cash on Delivery (COD)\n- Pay when order arrives\n- No extra charges\n\n💳 Card Payment\n- Debit/Credit Card accepted\n- Visa, Mastercard, Rupay\n\n📱 UPI Payment\n- Google Pay, PhonePe, Paytm\n- Instant payment\n\nTo specify payment:\n'create order for [name] product [item] qty [n] pay by cash'\n'create order for [name] product [item] qty [n] pay by card'\n'create order for [name] product [item] qty [n] pay by upi'"""
-
-    # 17B. PAYMENT STATUS
-    if re.search(r'payment status|is payment done|payment pending|payment complete', msg):
-        ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
-        if ord_match:
-            oid = ord_match.group(0)
-            o = next((x for x in orders if x.get("order_id") == oid), None)
-            if o:
-                return f"💳 Payment Status for {oid}:\n- Customer: {o.get('customer','?')}\n- Total: ${o.get('total','?')}\n- Payment Method: {o.get('payment_method','Cash').upper()}\n- Payment Status: {o.get('payment_status','Pending').upper()}\n- Order Status: {o.get('status','?').upper()}"
-            return f"Order {oid} not found."
-        return "Please specify Order ID (e.g. 'payment status ORD-001')"
 
     
 

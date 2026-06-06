@@ -107,7 +107,7 @@ Customers can:
 - ✅ Get invoices
 - ✅ Check order status
 
-## ⚠️ Product Management
+
 
 
 Products can be added via:

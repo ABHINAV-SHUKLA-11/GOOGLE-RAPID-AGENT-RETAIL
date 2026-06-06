@@ -126,3 +126,19 @@ This is intentional security design.
 - Multi-store support
 - WhatsApp bot integration
 - Email invoice delivery
+
+## 💳 Payment Integration
+
+Agent generates GST invoice automatically.
+Payment gateway can be integrated as per 
+your region and preference:
+
+| Region | Recommended |
+|--------|-------------|
+| India  | Razorpay / PayU |
+| USA    | Stripe / PayPal |
+| Global | Stripe / Adyen |
+
+Plugin your preferred payment gateway
+to /orders endpoint for complete
+payment flow.

@@ -41,11 +41,9 @@ def enrich(products):
 
 def fuzzy_match(product_name, products):
     product_name = product_name.lower().strip()
-    # Exact match
     for p in products:
         if product_name in p.get("name","").lower():
             return p
-    # Word by word match
     words = [w for w in product_name.split() if len(w) > 2]
     for p in products:
         pname = p.get("name","").lower()
@@ -59,12 +57,21 @@ def make_invoice(o):
     grand = round(sub + tax, 2)
     pay = o.get("payment_method", "cash").upper()
     pay_status = o.get("payment_status", "pending").upper()
+    
+    # Items list for multi-product orders
+    items_str = ""
+    if "items" in o and o["items"]:
+        items_str = "\nItems:\n"
+        for item in o["items"]:
+            items_str += f"  - {item.get('product','?')} x{item.get('qty','?')} = ${item.get('subtotal', 0)}\n"
+    
     return (
         f"🧾 INVOICE\n"
         f"{'='*30}\n"
         f"Order ID  : {o['order_id']}\n"
         f"Customer  : {o['customer']}\n"
-        f"Product   : {o['product']} x{o['quantity']}\n"
+        f"Product   : {o['product']} x{o['quantity']}"
+        f"{items_str}\n"
         f"{'-'*30}\n"
         f"Subtotal  : ${sub}\n"
         f"GST (18%) : ${tax}\n"
@@ -81,16 +88,98 @@ def agent(msg_original, products, orders, database):
     msg = msg_original.lower().strip()
     products = enrich(products)
 
-    # 1. CREATE ORDER
+    # 1. MULTIPLE PRODUCTS ORDER
     if re.search(r'create order|place order|new order', msg):
-        name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
+        # Check for multiple products pattern: "product X qty N and product Y qty M"
+        items_found = re.findall(r'(?:product\s+)?([A-Za-z\s]+?)\s+qty\s+(\d+)', msg_original, re.I)
+        name_match = re.search(r'for\s+(.+?)\s+(?:product|qty)', msg_original, re.I)
+        customer = name_match.group(1).strip() if name_match else "Walk-in"
+        pay_match = re.search(r'(cash|cod|card|upi|online)', msg)
+        payment_mode = pay_match.group(1).upper() if pay_match else "COD"
+        if payment_mode == "CASH":
+            payment_mode = "COD"
+
+        # Multiple products
+        if len(items_found) > 1:
+            total_amount = 0
+            order_items = []
+            product_names = []
+            total_qty = 0
+            for product_name, qty in items_found:
+                product_name = product_name.strip()
+                qty = int(qty)
+                matched = fuzzy_match(product_name, products)
+                if matched:
+                    subtotal = round(matched["price"] * qty, 2)
+                    total_amount += subtotal
+                    order_items.append({
+                        "product": matched["name"],
+                        "qty": qty,
+                        "price": matched["price"],
+                        "subtotal": subtotal
+                    })
+                    product_names.append(matched["name"])
+                    total_qty += qty
+                    # Reduce stock
+                    database.products.update_one(
+                        {"name": matched["name"]},
+                        {"$inc": {"stock": -qty}}
+                    )
+
+            if not order_items:
+                return "No matching products found. Check product names."
+
+            order_id = f"ORD-{datetime.now().strftime('%d%H%M%S')}"
+            total_amount = round(total_amount, 2)
+            tax = round(total_amount * 0.18, 2)
+            grand = round(total_amount + tax, 2)
+
+            order = {
+                "order_id": order_id,
+                "customer": customer,
+                "product": ", ".join(product_names),
+                "quantity": total_qty,
+                "items": order_items,
+                "status": "processing",
+                "total": total_amount,
+                "payment_method": payment_mode,
+                "payment_status": "PENDING",
+                "created_at": datetime.now().isoformat()
+            }
+            database.orders.insert_one(order)
+
+            items_str = "\n".join([f"  - {i['product']} x{i['qty']} = ${i['subtotal']}" for i in order_items])
+            return (
+                f"✅ Multi-Product Order Created!\n"
+                f"- ID      : {order_id}\n"
+                f"- Customer: {customer}\n"
+                f"Items:\n{items_str}\n"
+                f"{'-'*25}\n"
+                f"- Subtotal: ${total_amount}\n"
+                f"- GST 18% : ${tax}\n"
+                f"- Total   : ${grand}\n"
+                f"- Payment : {payment_mode}\n"
+                f"- Status  : Processing\n"
+                f"⚡ Stock updated automatically!"
+            )
+
+        # Single product order
         prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
         qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
-        customer = name.group(1).strip() if name else "Walk-in"
         product_name = prod.group(1).strip() if prod else ""
         quantity = int(qty.group(1)) if qty else 1
         matched = fuzzy_match(product_name, products)
         total = round(matched["price"] * quantity, 2) if matched else 0
+        tax = round(total * 0.18, 2)
+        grand = round(total + tax, 2)
+
+        if matched:
+            # Reduce stock
+            database.products.update_one(
+                {"name": matched["name"]},
+                {"$inc": {"stock": -quantity}}
+            )
+
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
             "customer": customer,
@@ -98,13 +187,11 @@ def agent(msg_original, products, orders, database):
             "quantity": quantity,
             "status": "processing",
             "total": total,
-            "payment_method": "cash",
-            "payment_status": "pending",
+            "payment_method": payment_mode,
+            "payment_status": "PENDING",
             "created_at": datetime.now().isoformat()
         }
         database.orders.insert_one(order)
-        tax = round(total * 0.18, 2)
-        grand = round(total + tax, 2)
         return (
             f"✅ Order Created!\n"
             f"- ID      : {order['order_id']}\n"
@@ -114,8 +201,9 @@ def agent(msg_original, products, orders, database):
             f"- Subtotal: ${total}\n"
             f"- GST 18% : ${tax}\n"
             f"- Total   : ${grand}\n"
-            f"- Payment : Cash on Delivery\n"
-            f"- Status  : Processing"
+            f"- Payment : {payment_mode}\n"
+            f"- Status  : Processing\n"
+            f"⚡ Stock updated automatically!"
         )
 
     # 2. DELETE ORDER
@@ -123,8 +211,15 @@ def agent(msg_original, products, orders, database):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
         if ord_match:
             oid = ord_match.group(0)
+            # Restore stock when order cancelled
+            order = database.orders.find_one({"order_id": oid})
+            if order:
+                database.products.update_one(
+                    {"name": order.get("product","")},
+                    {"$inc": {"stock": order.get("quantity", 0)}}
+                )
             r = database.orders.delete_one({"order_id": oid})
-            return f"🗑️ Order {oid} deleted!" if r.deleted_count else f"Order {oid} not found."
+            return f"🗑️ Order {oid} deleted & stock restored!" if r.deleted_count else f"Order {oid} not found."
         name_match = re.search(r'(?:delete|cancel|remove)\s+order\s+(?:for\s+)?(.+)', msg_original, re.I)
         if name_match:
             cname = name_match.group(1).strip()
@@ -134,14 +229,27 @@ def agent(msg_original, products, orders, database):
             return f"🗑️ Deleted {r.deleted_count} order(s) for {cname}!" if r.deleted_count else f"No orders for {cname}."
         return "Specify Order ID (e.g. ORD-001) or full customer name."
 
-    # 3. UPDATE ORDER STATUS
+    # 3. UPDATE ORDER STATUS - Payment PAID when delivered
     if re.search(r'update order|mark.*delivered|mark.*pending|mark.*processing|change status', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
         status_match = re.search(r'(?:as|to)\s+(delivered|pending|processing|cancelled)', msg)
         if ord_match and status_match:
             oid = ord_match.group(0)
             new_status = status_match.group(1)
-            database.orders.update_one({"order_id": oid}, {"$set": {"status": new_status}})
+            update_data = {"status": new_status}
+            
+            # Auto payment confirm when delivered
+            if new_status == "delivered":
+                update_data["payment_status"] = "PAID"
+                update_data["delivered_at"] = datetime.now().isoformat()
+                database.orders.update_one({"order_id": oid}, {"$set": update_data})
+                return (
+                    f"✅ Order {oid} marked as DELIVERED!\n"
+                    f"💰 Payment Status: PAID ✅\n"
+                    f"🎉 Order Complete!"
+                )
+            
+            database.orders.update_one({"order_id": oid}, {"$set": update_data})
             return f"✅ Order {oid} status updated to {new_status}!"
         return "Specify Order ID and status (e.g. 'mark ORD-001 as delivered')"
 
@@ -152,7 +260,8 @@ def agent(msg_original, products, orders, database):
         for p in products:
             if p.get("name","").lower() in msg:
                 database.products.update_one({"name": p["name"]}, {"$inc": {"stock": qty}})
-                return f"✅ {p['name']} restocked! +{qty} units added."
+                new_stock = p.get("stock", 0) + qty
+                return f"✅ {p['name']} restocked!\n- Added: {qty} units\n- New Stock: {new_stock} units"
         return "Specify product name and quantity."
 
     # 5. LOW STOCK
@@ -169,13 +278,15 @@ def agent(msg_original, products, orders, database):
         delivered = len([o for o in orders if o.get("status") == "delivered"])
         processing = len([o for o in orders if o.get("status") == "processing"])
         pending = len([o for o in orders if o.get("status") == "pending"])
+        paid = sum(o.get("total",0) for o in orders if o.get("payment_status") == "PAID")
         return (
             f"💰 Revenue Report:\n"
-            f"- Total Revenue: ${round(total,2)}\n"
-            f"- Total Orders : {len(orders)}\n"
-            f"- Delivered    : {delivered}\n"
-            f"- Processing   : {processing}\n"
-            f"- Pending      : {pending}"
+            f"- Total Revenue  : ${round(total,2)}\n"
+            f"- Amount Received: ${round(paid,2)}\n"
+            f"- Total Orders   : {len(orders)}\n"
+            f"- Delivered      : {delivered}\n"
+            f"- Processing     : {processing}\n"
+            f"- Pending        : {pending}"
         )
 
     # 7. BILL/INVOICE
@@ -200,7 +311,7 @@ def agent(msg_original, products, orders, database):
                         sub = o.get("total", 0)
                         tax = round(sub * 0.18, 2)
                         grand = round(sub + tax, 2)
-                        bills.append(f"- {o['order_id']} | {o['product']} | ${sub} + GST ${tax} = ${grand}")
+                        bills.append(f"- {o['order_id']} | {o['product']} | ${sub} + GST ${tax} = ${grand} | {o.get('payment_status','PENDING')}")
                     return f"🧾 Bills for {cname} ({len(matched)} orders):\n" + "\n".join(bills)
             return f"No orders found for {cname}."
 
@@ -235,7 +346,7 @@ def agent(msg_original, products, orders, database):
         if cat in msg:
             filtered = [p for p in products if cat in p.get("category","").lower()]
             if filtered:
-                lines = [f"- {p['name']} | ${p['price']} | ⭐{p['rating']}" for p in filtered]
+                lines = [f"- {p['name']} | ${p['price']} | ⭐{p['rating']} | Stock: {p['stock']}" for p in filtered]
                 return f"👟 {cat.title()} ({len(filtered)} items):\n" + "\n".join(lines)
 
     # 12. ORDERS FOR CUSTOMER
@@ -245,7 +356,7 @@ def agent(msg_original, products, orders, database):
             cname = name_match.group(1).strip()
             matched = [o for o in orders if cname.lower() in o.get("customer","").lower()]
             if matched:
-                lines = [f"- {o['order_id']} | {o['product']} x{o['quantity']} | {o['status']} | ${o['total']}" for o in matched]
+                lines = [f"- {o['order_id']} | {o['product']} x{o['quantity']} | {o['status']} | ${o['total']} | Pay: {o.get('payment_status','PENDING')}" for o in matched]
                 return f"📋 Orders for {cname}:\n" + "\n".join(lines)
             return f"No orders for {cname}."
 
@@ -269,21 +380,23 @@ def agent(msg_original, products, orders, database):
     # 14. DASHBOARD
     if re.search(r'dashboard|summary|overview|analytics|report', msg):
         total_rev = sum(o.get("total",0) for o in orders)
+        paid_rev = sum(o.get("total",0) for o in orders if o.get("payment_status") == "PAID")
         low = [p for p in products if p.get("stock",0) < 30]
         best = max(products, key=lambda x: x.get("rating",0)) if products else {}
         return (
             f"📊 Store Dashboard:\n"
-            f"- Products   : {len(products)}\n"
-            f"- Orders     : {len(orders)}\n"
-            f"- Revenue    : ${round(total_rev,2)}\n"
-            f"- Low Stock  : {len(low)} items\n"
-            f"- Top Product: {best.get('name','N/A')} ⭐{best.get('rating','')}"
+            f"- Products     : {len(products)}\n"
+            f"- Orders       : {len(orders)}\n"
+            f"- Total Revenue: ${round(total_rev,2)}\n"
+            f"- Amount Paid  : ${round(paid_rev,2)}\n"
+            f"- Low Stock    : {len(low)} items\n"
+            f"- Top Product  : {best.get('name','N/A')} ⭐{best.get('rating','')}"
         )
 
     # 15. ALL ORDERS
     if re.search(r'all orders|show orders|list orders|orders', msg):
         if orders:
-            lines = [f"- {o.get('order_id','?')} | {o.get('customer','?')} | {o.get('product','?')} x{o.get('quantity','?')} | {o.get('status','?')} | ${o.get('total','?')}" for o in orders]
+            lines = [f"- {o.get('order_id','?')} | {o.get('customer','?')} | {o.get('product','?')} x{o.get('quantity','?')} | {o.get('status','?')} | ${o.get('total','?')} | {o.get('payment_status','PENDING')}" for o in orders]
             return f"🛒 All Orders ({len(orders)}):\n" + "\n".join(lines)
         return "No orders found."
 
@@ -307,7 +420,7 @@ def agent(msg_original, products, orders, database):
                     return f"📦 {matched['name']}\n- Price: ${matched['price']}\n- Stock: {matched['stock']} units\n- Category: {matched.get('category','N/A')}\n- Rating: ⭐{matched['rating']} ({matched['reviews']} reviews)"
         return "Product not found. Type 'show all products' to see available items."
 
-    # 17A. PAYMENT METHOD
+    # PAYMENT METHOD
     if re.search(r'payment method|how to pay|payment options|pay by|payment mode', msg):
         return (
             "💳 Payment Options:\n\n"
@@ -322,7 +435,7 @@ def agent(msg_original, products, orders, database):
             "- Instant payment\n"
         )
 
-    # 17B. PAYMENT STATUS
+    # PAYMENT STATUS
     if re.search(r'payment status|is payment done|payment pending|payment complete', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
         if ord_match:
@@ -334,13 +447,13 @@ def agent(msg_original, products, orders, database):
                     f"- Customer      : {o.get('customer','?')}\n"
                     f"- Total         : ${o.get('total','?')}\n"
                     f"- Payment Method: {o.get('payment_method','Cash').upper()}\n"
-                    f"- Payment Status: {o.get('payment_status','Pending').upper()}\n"
+                    f"- Payment Status: {o.get('payment_status','PENDING').upper()}\n"
                     f"- Order Status  : {o.get('status','?').upper()}"
                 )
             return f"Order {oid} not found."
         return "Please specify Order ID (e.g. 'payment status ORD-001')"
 
-    # 17. HELLO/HELP
+    # HELLO/HELP
     if re.search(r'hello|hi|help|what can you', msg):
         return (
             "👋 Hello! I am your Retail AI Agent!\n\n"
@@ -354,6 +467,7 @@ def agent(msg_original, products, orders, database):
             "- show all orders\n"
             "- orders for [customer name]\n"
             "- create order for [name] product [item] qty [n]\n"
+            "- create order for [name] product [item1] qty [n] and [item2] qty [m]\n"
             "- delete order [ORD-ID or customer name]\n"
             "- mark ORD-001 as delivered\n\n"
             "🧾 BILLING:\n"
@@ -429,7 +543,7 @@ def add_product():
 def get_orders():
     try:
         orders = list(get_db().orders.find({}, {"_id": 0}).limit(20))
-        formatted = [{"order_id": o.get("order_id",""), "customer": o.get("customer",""), "product": o.get("product",""), "quantity": o.get("quantity",0), "status": o.get("status",""), "total": o.get("total",0)} for o in orders]
+        formatted = [{"order_id": o.get("order_id",""), "customer": o.get("customer",""), "product": o.get("product",""), "quantity": o.get("quantity",0), "status": o.get("status",""), "total": o.get("total",0), "payment_status": o.get("payment_status","PENDING")} for o in orders]
         return {"status": "success", "orders": formatted, "count": len(formatted)}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
@@ -461,14 +575,14 @@ def update_order(order_id):
 @app.route('/mcp/tools', methods=['GET'])
 def get_mcp_tools():
     return {
-        "get_products": {"description": "Get all products with ratings"},
-        "get_orders": {"description": "Get all orders"},
-        "create_order": {"description": "Create new order"},
-        "delete_order": {"description": "Delete order by ID or customer"},
-        "update_order": {"description": "Update order status"},
-        "get_revenue": {"description": "Get revenue report"},
+        "get_products": {"description": "Get all products with ratings and stock"},
+        "get_orders": {"description": "Get all orders with payment status"},
+        "create_order": {"description": "Create single or multi-product order with auto stock update"},
+        "delete_order": {"description": "Delete order by ID or customer, restores stock"},
+        "update_order": {"description": "Update order status, auto payment on delivery"},
+        "get_revenue": {"description": "Get revenue report with paid/pending breakdown"},
         "get_low_stock": {"description": "Get low stock alerts"},
-        "generate_bill": {"description": "Generate invoice for order"}
+        "generate_bill": {"description": "Generate GST invoice for order"}
     }, 200
 
 @app.errorhandler(404)

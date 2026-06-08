@@ -86,7 +86,7 @@ def agent(msg_original, products, orders, database):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
         prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
         qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
-        customer = name.group(1).strip() if name else "Walk-in"
+        customer = name.group(1).strip().title() if name else "Walk-in Customer"
         product_name = prod.group(1).strip() if prod else ""
         quantity = int(qty.group(1)) if qty else 1
         matched = fuzzy_match(product_name, products)
@@ -102,8 +102,14 @@ def agent(msg_original, products, orders, database):
             "payment_status": "pending",
             "created_at": datetime.now().isoformat()
         }
-        database.orders.insert_one(order)
-        tax = round(total * 0.18, 2)
+       database.orders.insert_one(order)
+# Stock update
+if matched:
+    database.products.update_one(
+        {"name": matched["name"]},
+        {"$inc": {"stock": -quantity}}
+    )
+tax = round(total * 0.18, 2)
         grand = round(total + tax, 2)
         return (
             f"✅ Order Created!\n"

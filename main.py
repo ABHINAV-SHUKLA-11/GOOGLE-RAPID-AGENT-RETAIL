@@ -81,7 +81,8 @@ def agent(msg_original, products, orders, database):
     msg = msg_original.lower().strip()
     products = enrich(products)
 
-    # 1. CREATE ORDER
+    
+   # 1. CREATE ORDER
     if re.search(r'create order|place order|new order', msg):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
         prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
@@ -90,6 +91,13 @@ def agent(msg_original, products, orders, database):
         product_name = prod.group(1).strip() if prod else ""
         quantity = int(qty.group(1)) if qty else 1
         matched = fuzzy_match(product_name, products)
+
+        # STOCK CHECK  ← NEW
+        if matched:
+            available_stock = matched.get("stock", 0)
+            if available_stock < quantity:
+                return f"❌ Sorry! Only {available_stock} units of {matched['name']} available. Please reduce quantity."
+
         total = round(matched["price"] * quantity, 2) if matched else 0
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
@@ -103,6 +111,14 @@ def agent(msg_original, products, orders, database):
             "created_at": datetime.now().isoformat()
         }
         database.orders.insert_one(order)
+
+        # STOCK DEDUCT  ← NEW
+        if matched:
+            database.products.update_one(
+                {"name": matched["name"]},
+                {"$inc": {"stock": -quantity}}
+            )
+
         tax = round(total * 0.18, 2)
         grand = round(total + tax, 2)
         return (
@@ -115,23 +131,42 @@ def agent(msg_original, products, orders, database):
             f"- GST 18% : ${tax}\n"
             f"- Total   : ${grand}\n"
             f"- Payment : Cash on Delivery\n"
-            f"- Status  : Processing"
+            f"- Status  : Processing\n"
+            f"- Stock Left: {available_stock - quantity} units"  # ← NEW
         )
 
-    # 2. DELETE ORDER
+    
+  # 2. DELETE ORDER
     if re.search(r'delete order|cancel order|remove order', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
         if ord_match:
             oid = ord_match.group(0)
-            r = database.orders.delete_one({"order_id": oid})
-            return f"🗑️ Order {oid} deleted!" if r.deleted_count else f"Order {oid} not found."
+            o = database.orders.find_one({"order_id": oid})
+            if o:
+                # STOCK RESTORE
+                database.products.update_one(
+                    {"name": o["product"]},
+                    {"$inc": {"stock": o["quantity"]}}
+                )
+                database.orders.delete_one({"order_id": oid})
+                return f"🗑️ Order {oid} deleted!\n✅ Stock restored: +{o['quantity']} units of {o['product']}"
+            return f"Order {oid} not found."
         name_match = re.search(r'(?:delete|cancel|remove)\s+order\s+(?:for\s+)?(.+)', msg_original, re.I)
         if name_match:
             cname = name_match.group(1).strip()
             if len(cname) < 3:
                 return "Please provide valid customer name (min 3 characters)."
-            r = database.orders.delete_many({"customer": {"$regex": cname, "$options": "i"}})
-            return f"🗑️ Deleted {r.deleted_count} order(s) for {cname}!" if r.deleted_count else f"No orders for {cname}."
+            orders_to_delete = list(database.orders.find({"customer": {"$regex": cname, "$options": "i"}}))
+            if orders_to_delete:
+                for o in orders_to_delete:
+                    # STOCK RESTORE
+                    database.products.update_one(
+                        {"name": o["product"]},
+                        {"$inc": {"stock": o.get("quantity", 0)}}
+                    )
+                database.orders.delete_many({"customer": {"$regex": cname, "$options": "i"}})
+                return f"🗑️ Deleted {len(orders_to_delete)} order(s) for {cname}!\n✅ Stock restored for all products!"
+            return f"No orders for {cname}."
         return "Specify Order ID (e.g. ORD-001) or full customer name."
 
     # 3. UPDATE ORDER STATUS
@@ -311,6 +346,36 @@ def agent(msg_original, products, orders, database):
                     return f"📦 {matched['name']}\n- Price: ${matched['price']}\n- Stock: {matched['stock']} units\n- Category: {matched.get('category','N/A')}\n- Rating: ⭐{matched['rating']} ({matched['reviews']} reviews)"
         return "Product not found. Type 'show all products' to see available items."
 
+
+
+    # 17C. ADD PRODUCT (Admin only)
+    if re.search(r'add product|new product|create product', msg):
+        prod_name = re.search(r'(?:add|new|create)\s+product\s+(.+?)\s+price', msg_original, re.I)
+        price_match = re.search(r'price\s*\$?(\d+\.?\d*)', msg_original, re.I)
+        stock_match = re.search(r'stock\s+(\d+)', msg_original, re.I)
+        cat_match = re.search(r'category\s+(\w+)', msg_original, re.I)
+
+        if not prod_name or not price_match:
+            return (
+                "❌ Format: add product [name] price [amount] stock [qty] category [type]\n"
+                "Example: add product Air Jordan price 400 stock 25 category shoes"
+            )
+
+        new_product = {
+            "name": prod_name.group(1).strip(),
+            "price": float(price_match.group(1)),
+            "stock": int(stock_match.group(1)) if stock_match else 0,
+            "category": cat_match.group(1).lower() if cat_match else "general"
+        }
+        database.products.insert_one(new_product)
+        return (
+            f"✅ Product Added!\n"
+            f"- Name    : {new_product['name']}\n"
+            f"- Price   : ${new_product['price']}\n"
+            f"- Stock   : {new_product['stock']} units\n"
+            f"- Category: {new_product['category']}"
+        )
+
     # 17A. PAYMENT METHOD
     if re.search(r'payment method|how to pay|payment options|pay by|payment mode', msg):
         return (
@@ -371,6 +436,12 @@ def agent(msg_original, products, orders, database):
             "- store dashboard\n"
             "- low stock alerts\n"
             "- who bought Nike Air Max\n\n"
+            "🛒 ORDERS:\n"
+"- create order for [name] product [item] qty [n]\n"
+"- delete order [ORD-ID or customer name]\n"
+"- mark ORD-001 as delivered\n\n"
+"➕ ADMIN:\n"                                          # ← ADD
+"- add product [name] price [amount] stock [qty] category [shoes/clothing]\n\n"  # ← ADD
             "Ask me anything!"
         )
 

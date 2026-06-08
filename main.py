@@ -86,7 +86,7 @@ def agent(msg_original, products, orders, database):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
         prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
         qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
-        customer = name.group(1).strip() if name else "Walk-in"
+        customer = name.group(1).strip() if name else ""
         product_name = prod.group(1).strip() if prod else ""
         quantity = int(qty.group(1)) if qty else 1
         matched = fuzzy_match(product_name, products)

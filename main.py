@@ -102,14 +102,9 @@ def agent(msg_original, products, orders, database):
             "payment_status": "pending",
             "created_at": datetime.now().isoformat()
         }
-       database.orders.insert_one(order)
-# Stock update
-if matched:
-    database.products.update_one(
-        {"name": matched["name"]},
-        {"$inc": {"stock": -quantity}}
-    )
+database.orders.insert_one(order)
 tax = round(total * 0.18, 2)
+
         grand = round(total + tax, 2)
         return (
             f"✅ Order Created!\n"

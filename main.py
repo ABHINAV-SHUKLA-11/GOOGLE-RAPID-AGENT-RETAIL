@@ -83,7 +83,7 @@ def agent(msg_original, products, orders, database):
 
     # 1. CREATE ORDER
     if re.search(r'create order|place order|new order', msg):
-     name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
+ name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
 prod = re.search(r'product\s+(.+?)\s+qty', msg_original, re.I)
 qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
 customer = name.group(1).strip() if name else "Walk-in Customer"
@@ -98,8 +98,6 @@ if matched:
         {"name": matched["name"]},
         {"$inc": {"stock": -quantity}}
     )
-        matched = fuzzy_match(product_name, products)
-        total = round(matched["price"] * quantity, 2) if matched else 0
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
             "customer": customer if customer else "Walk-in Customer",

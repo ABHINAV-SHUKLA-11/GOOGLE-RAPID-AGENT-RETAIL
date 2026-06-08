@@ -169,15 +169,35 @@ def agent(msg_original, products, orders, database):
             return f"No orders for {cname}."
         return "Specify Order ID (e.g. ORD-001) or full customer name."
 
-    # 3. UPDATE ORDER STATUS
+    
+  # 3. UPDATE ORDER STATUS
     if re.search(r'update order|mark.*delivered|mark.*pending|mark.*processing|change status', msg):
         ord_match = re.search(r'ORD-[\w]+', msg_original.upper())
         status_match = re.search(r'(?:as|to)\s+(delivered|pending|processing|cancelled)', msg)
         if ord_match and status_match:
             oid = ord_match.group(0)
             new_status = status_match.group(1)
-            database.orders.update_one({"order_id": oid}, {"$set": {"status": new_status}})
-            return f"✅ Order {oid} status updated to {new_status}!"
+            
+            # PAYMENT AUTO UPDATE ← NEW
+            update_fields = {"status": new_status}
+            if new_status == "delivered":
+                update_fields["payment_status"] = "paid"
+            elif new_status == "cancelled":
+                update_fields["payment_status"] = "refunded"
+            
+            database.orders.update_one(
+                {"order_id": oid}, 
+                {"$set": update_fields}
+            )
+            
+            # RESPONSE
+            if new_status == "delivered":
+                return f"✅ Order {oid} marked as DELIVERED!\n💳 Payment Status → PAID automatically!"
+            elif new_status == "cancelled":
+                return f"❌ Order {oid} CANCELLED!\n💳 Payment Status → REFUNDED!"
+            else:
+                return f"✅ Order {oid} status updated to {new_status}!"
+        
         return "Specify Order ID and status (e.g. 'mark ORD-001 as delivered')"
 
     

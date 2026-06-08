@@ -145,16 +145,20 @@ def agent(msg_original, products, orders, database):
             return f"✅ Order {oid} status updated to {new_status}!"
         return "Specify Order ID and status (e.g. 'mark ORD-001 as delivered')"
 
-    # 4. RESTOCK
+    
+# 4. RESTOCK
     if re.search(r'restock|add stock|update stock', msg):
         qty_match = re.search(r'(\d+)', msg)
         qty = int(qty_match.group(1)) if qty_match else 0
-        for p in products:
-            if p.get("name","").lower() in msg:
-                database.products.update_one({"name": p["name"]}, {"$inc": {"stock": qty}})
-                return f"✅ {p['name']} restocked! +{qty} units added."
-        return "Specify product name and quantity."
-
+        matched_product = fuzzy_match(msg, products)  # ← FIXED
+        if matched_product:
+            database.products.update_one(
+                {"name": matched_product["name"]}, 
+                {"$inc": {"stock": qty}}
+            )
+            new_stock = matched_product["stock"] + qty
+            return f"✅ {matched_product['name']} restocked!\n- Added: +{qty} units\n- New Stock: {new_stock} units"
+        return "Specify product name and quantity. (e.g. 'restock Nike Air Max 50')"
     # 5. LOW STOCK
     if re.search(r'low stock|running low|stock alert|reorder', msg):
         low = [p for p in products if p.get("stock", 0) < 30]

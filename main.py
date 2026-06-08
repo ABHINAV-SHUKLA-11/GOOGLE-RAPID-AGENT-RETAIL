@@ -82,7 +82,7 @@ def agent(msg_original, products, orders, database):
     products = enrich(products)
 
     # 1. CREATE ORDER
-      if re.search(r'create order|place order|new order', msg):
+    if re.search(r'create order|place order|new order', msg):
         name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
         prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
         qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
@@ -93,7 +93,7 @@ def agent(msg_original, products, orders, database):
         total = round(matched["price"] * quantity, 2) if matched else 0
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
-            "customer": customer, 
+            "customer": customer,
             "product": matched["name"] if matched else product_name,
             "quantity": quantity,
             "status": "processing",

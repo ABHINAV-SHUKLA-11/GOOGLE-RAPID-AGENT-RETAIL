@@ -83,17 +83,26 @@ def agent(msg_original, products, orders, database):
 
     # 1. CREATE ORDER
     if re.search(r'create order|place order|new order', msg):
-        name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
-        prod = re.search(r'product\s+(.+?)(?:\s+qty|$)', msg_original, re.I)
-        qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
-        customer = name.group(1).strip() if name else ""
-        product_name = prod.group(1).strip() if prod else ""
-        quantity = int(qty.group(1)) if qty else 1
+     name = re.search(r'for\s+(.+?)\s+product', msg_original, re.I)
+prod = re.search(r'product\s+(.+?)\s+qty', msg_original, re.I)
+qty = re.search(r'qty\s+(\d+)', msg_original, re.I)
+customer = name.group(1).strip() if name else "Walk-in Customer"
+product_name = prod.group(1).strip() if prod else ""
+quantity = int(qty.group(1)) if qty else 1
+matched = fuzzy_match(product_name, products)
+total = round(matched["price"] * quantity, 2) if matched else 0
+
+# STOCK UPDATE
+if matched:
+    database.products.update_one(
+        {"name": matched["name"]},
+        {"$inc": {"stock": -quantity}}
+    )
         matched = fuzzy_match(product_name, products)
         total = round(matched["price"] * quantity, 2) if matched else 0
         order = {
             "order_id": f"ORD-{datetime.now().strftime('%d%H%M%S')}",
-            "customer": customer,
+            "customer": customer if customer else "Walk-in Customer",
             "product": matched["name"] if matched else product_name,
             "quantity": quantity,
             "status": "processing",

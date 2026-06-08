@@ -99,24 +99,13 @@ MIT License
 
 ## ⚠️ Important Note — Product Management
 
-This agent is **customer-facing**.
-
-Customers can:
-- ✅ Browse products
-- ✅ Place orders
-- ✅ Get invoices
-- ✅ Check order status
-
-
-
-
 Products can be added via:
 
 1. MongoDB Atlas (Direct)
 2. REST API → POST /products
 3. Postman / Any API Client
+4. Admin can add product through agent
 
-Customers CANNOT add products.
 This is intentional security design.
 
 

@@ -1,31 +1,31 @@
-# 🛍️ Retail AI Agent — Team Cloud Craft
+# Retail AI Agent — Team Cloud Craft
 
 > Smart AI-powered retail management agent built for **Google Cloud Rapid Agent Hackathon 2026** — Brick-and-Mortar Retail Track.
 
-## 🔗 Live Demo
+##  Live Demo
 - **Frontend UI:** https://google-rapid-agent-retail-44551099700.europe-west1.run.app/ui
 - **API:** https://google-rapid-agent-retail-44551099700.europe-west1.run.app
 
-## 👥 Team
+##  Team
 - **Abhinav Shukla** — Team Cloud Craft
 - **Rishabh Gautam** — Team Cloud Craft
 
-## 🏗️ Architecture
+##  Architecture
 User → Frontend UI → Google Cloud Run → MongoDB Atlas
 ↑
 Google Agent Builder (Gemini 2.5 Flash)
 ↑
 MongoDB MCP Server
 
-## 🚀 Features
-- 🔍 Product search, price & rating filters
-- 🛒 Order create, delete, update via chat
-- 🧾 GST Invoice generation (18%)
-- 📊 Revenue reports & store analytics
-- ⚠️ Low stock alerts
-- 🏆 Top rated products
+##  Features
+- Product search, price & rating filters
+-  Order create, delete, update via chat
+-  GST Invoice generation (18%)
+-  Revenue reports & store analytics
+-  Low stock alerts
+-  Top rated products
 
-## 💬 Example Commands
+## Example Commands
 
 show all products
 products under $100
@@ -40,7 +40,7 @@ delete order Rahul Kumar
 mark ORD-001 as delivered
 who bought Nike Air Max
 
-## 🛠️ Tech Stack
+##  Tech Stack
 | Layer | Technology |
 |-------|-----------|
 | AI Agent | Google Agent Builder + Gemini 2.5 Flash |
@@ -50,7 +50,7 @@ who bought Nike Air Max
 | Deployment | Google Cloud Run (europe-west1) |
 | Frontend | HTML/CSS/JavaScript |
 
-## 🔧 API Endpoints
+##  API Endpoints
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | /ui | Frontend dashboard |
@@ -64,7 +64,7 @@ who bought Nike Air Max
 | GET | /mcp/tools | MCP tools |
 | GET | /health | Health check |
 
-## 📦 Setup
+##  Setup
 
 ### Environment Variables
 
@@ -86,18 +86,18 @@ npm install -g mongodb-mcp-server
 MDB_MCP_CONNECTION_STRING="your_mongodb_uri" mongodb-mcp-server
 ```
 
-## 🏆 Hackathon Track
+##  Hackathon Track
 **Brick-and-Mortar Retail** — Bridges digital convenience and physical retail:
 - Real-time inventory management
 - Automated order processing via natural language
 - Instant GST invoice generation
 - AI-powered store analytics & insights
 
-## 📄 License
+##  License
 MIT License
 
 
-## ⚠️ Important Note — Product Management
+## Important Note — Product Management
 
 Products can be added via:
 
@@ -109,14 +109,14 @@ Products can be added via:
 This is intentional security design.
 
 
-## 🔮 Future Scope
+##  Future Scope
 - Razorpay payment gateway integration
 - Customer login/authentication
 - Multi-store support
 - WhatsApp bot integration
 - Email invoice delivery
 
-## 💳 Payment Integration
+##  Payment Integration
 
 Agent generates GST invoice automatically.
 Payment gateway can be integrated as per 
